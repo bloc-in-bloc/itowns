@@ -30,6 +30,10 @@ const include = [
     path.resolve(__dirname, 'utils'),
 ];
 
+const exclude = [
+    path.resolve(__dirname, 'src/Libs'),
+];
+
 module.exports = () => {
     const babelLoaderOptions = [];
     if (!noInline) {
@@ -80,6 +84,7 @@ module.exports = () => {
         plugins: [
             new ESLintPlugin({
                 files: include,
+				exclude
             }),
         ],
         devServer: {
