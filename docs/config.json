@@ -49,6 +49,7 @@
                 "PointCloudLayer",
                 "PotreeLayer",
                 "CopcLayer",
+                "Potree2Layer",
                 "C3DTilesLayer",
                 "LabelLayer",
                 "GlobeLayer",
