@@ -75,10 +75,6 @@ module.exports = () => {
                     include,
                     use: babelLoaderOptions,
                 },
-                {
-                    test: /\.worker\.js$/,
-                    use: { loader: 'worker-loader' },
-                },
             ],
         },
         plugins: [
