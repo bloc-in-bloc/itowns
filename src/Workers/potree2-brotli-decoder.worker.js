@@ -34,7 +34,7 @@ of the authors and should not be interpreted as representing official policies,
  */
 
 import { PointAttribute, PointAttributeTypes } from 'Core/Potree2PointAttributes';
-import { decompress } from 'brotli-compress';
+import { BrotliDecode } from 'Libs/brotli/decode';
 
 const typedArrayMapping = {
     int8: Int8Array,
@@ -95,7 +95,7 @@ onmessage = async function processMessage(event) {
         buffer = { buffer: new ArrayBuffer(0) };
     } else {
         try {
-            buffer = await decompress(new Int8Array(event.data.buffer));
+            buffer = BrotliDecode(new Int8Array(event.data.buffer));
         } catch (e) {
             buffer = { buffer: new ArrayBuffer(numPoints * (pointAttributes.byteSize + 12)) };
             console.error(`problem with node ${name}: `, e);
