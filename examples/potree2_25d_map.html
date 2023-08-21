@@ -95,6 +95,11 @@
                 view = new itowns.View('EPSG:3946', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer });
                 view.mainLoop.gfxEngine.renderer.setClearColor(0xcccccc);
 
+                view.domElement.addEventListener("mousemove", (event) => {
+                    const result = view.pickObjectsAt(event, 100);
+                    console.log(result.length);
+                });
+
                 // Configure Point Cloud layer
                 potreeLayer = new itowns.Potree2Layer('Lion', {
                     source: new itowns.Potree2Source({
@@ -106,7 +111,6 @@
 
                 // add potreeLayer to scene
                 function onLayerReady() {
-                    console.log(view.scene);
                     const gridHelper = new THREE.GridHelper( 50, 50 );
                     gridHelper.position.y = - 1;
                     view.scene.add( gridHelper );
@@ -119,9 +123,6 @@
 
                     potreeLayer.root.bbox.getSize(size);
                     potreeLayer.root.bbox.getCenter(center);
-
-                    console.log(center);
-                    console.log(size);
 
                     const box = new THREE.Box3();
                     box.setFromCenterAndSize(center, size);
