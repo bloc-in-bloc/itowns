@@ -92,12 +92,15 @@
                 var rendererSize = customRenderer.getSize(new THREE.Vector2());
                 var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 1, 10000);
                 scene.add(customCamera);
-                view = new itowns.View('EPSG:3946', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer });
-                view.mainLoop.gfxEngine.renderer.setClearColor(0xcccccc);
+                view = new itowns.View('EPSG:3946', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene });
+                view.mainLoop.gfxEngine.renderer.setClearColor(0x000000, 0);
+                view.mainLoop.gfxEngine.label2dRenderer.domElement.style.pointerEvents = 'none';
 
-                view.domElement.addEventListener("mousemove", (event) => {
-                    const result = view.pickObjectsAt(event, 100);
-                    console.log(result.length);
+                customRenderer.domElement.addEventListener("mousedown", (event) => {
+                    const result = view.pickObjectsAt(event, 10);
+                    if (result.length > 0) {
+                        this.controls.setOrbitPoint(result[0].point.x, result[0].point.y, result[0].point.z);
+                    }
                 });
 
                 // Configure Point Cloud layer
@@ -108,6 +111,7 @@
                         crs: view.referenceCrs,
                     }),
                 });
+                potreeLayer.pointSize = 0;
 
                 // add potreeLayer to scene
                 function onLayerReady() {
@@ -124,10 +128,10 @@
                     potreeLayer.root.bbox.getSize(size);
                     potreeLayer.root.bbox.getCenter(center);
 
-                    const box = new THREE.Box3();
-                    box.setFromCenterAndSize(center, size);
-                    const helper = new THREE.Box3Helper(box, new THREE.Color(0xff0000));
-                    view.scene.add(helper);
+                    /// const box = new THREE.Box3();
+                    // box.setFromCenterAndSize(center, size);
+                    // const helper = new THREE.Box3Helper(box, new THREE.Color(0xff0000));
+                    // view.scene.add(helper);
 
                     debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
 
@@ -153,6 +157,7 @@
                     if (updated) {
                         view.notifyChange(customCamera);
                     }
+                    customRenderer.render(scene, customCamera);
                     requestAnimationFrame( animate );
                 }
 
