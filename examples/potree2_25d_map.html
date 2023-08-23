@@ -110,8 +110,13 @@
                         url: 'https://blocinbloc-public-test.s3.fr-par.scw.cloud/lion-potree2',
                         crs: view.referenceCrs,
                     }),
+                    material : {
+                        minAdaptiveSize: 6,
+                        maxAdaptiveSize: 10,
+                        adaptiveScale: 2
+                    },
+                    pointSize: 0
                 });
-                potreeLayer.pointSize = 0;
 
                 // add potreeLayer to scene
                 function onLayerReady() {
