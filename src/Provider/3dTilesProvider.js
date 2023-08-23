@@ -29,7 +29,15 @@ function pntsParse(data, layer) {
     return PntsParser.parse(data, layer.registeredExtensions).then((result) => {
         const material = layer.material ?
             layer.material.clone() :
-            new PointsMaterial({ size: 0.05, mode: layer.pntsMode, shape: layer.pntsShape, classification: layer.classification });
+            new PointsMaterial({
+                size: 0.05,
+                mode: layer.pntsMode,
+				shape: layer.pntsShape,
+                classification: layer.classification,
+                sizeMode: layer.pntsSize,
+                minAttenuateSize: layer.pntsMinAttenuateSize,
+                maxAttenuateSize: layer.pntsMaxAttenuateSize,
+            });
 
         // refer material properties in the layer so when layers opacity and visibility is updated, the material is
         // automatically updated

@@ -17,6 +17,11 @@ export const PNTS_SHAPE = {
     SQUARE: 1,
 };
 
+export const PNTS_SIZE = {
+    VALUE: 0,
+    ATTENUATE: 1,
+};
+
 const white = new THREE.Color(1.0,  1.0,  1.0);
 
 /**
@@ -65,6 +70,9 @@ class PointsMaterial extends THREE.RawShaderMaterial {
      * @param      {THREE.Vector2}  [options.intensityRange=new THREE.Vector2(0, 1)]  intensity range.
      * @param      {boolean}  [options.applyOpacityClassication=false]  apply opacity classification on all display mode.
      * @param      {Classification}  [options.classification] -  define points classification.
+     * @param      {number}  [options.sizeMode=SIZE_MODE.VALUE]  point cloud size mode. Only 'VALUE' or 'ATTENUATE' are possible. VALUE use constant size, ATTENUATE compute size depending on distance from point to camera.
+     * @param      {number}  [options.minAttenuateSize=3]  minimum scale used by 'ATTENUATE' size mode
+     * @param      {number}  [options.maxAttenuateSize=10]  maximum scale used by 'ATTENUATE' size mode
      * @property {Classification}  classification - points classification.
      *
      * @example
@@ -80,7 +88,10 @@ class PointsMaterial extends THREE.RawShaderMaterial {
         const applyOpacityClassication = options.applyOpacityClassication == undefined ? false : options.applyOpacityClassication;
         const size = options.size || 0;
         const mode = options.mode || PNTS_MODE.COLOR;
-        const shape = options.shape || PNTS_SHAPE.CIRCLE;
+		const shape = options.shape || PNTS_SHAPE.CIRCLE;
+        const sizeMode = size === 0 ? PNTS_SIZE.ATTENUATE : (options.sizeMode || PNTS_SIZE.VALUE);
+        const minAttenuateSize = options.minAttenuateSize || 3;
+        const maxAttenuateSize = options.maxAttenuateSize || 10;
 
         delete options.orientedImageMaterial;
         delete options.intensityRange;
@@ -88,7 +99,10 @@ class PointsMaterial extends THREE.RawShaderMaterial {
         delete options.applyOpacityClassication;
         delete options.size;
         delete options.mode;
-        delete options.shape;
+		delete options.shape;
+        delete options.sizeMode;
+        delete options.minAttenuateSize;
+        delete options.maxAttenuateSize;
 
         super(options);
 
@@ -98,6 +112,7 @@ class PointsMaterial extends THREE.RawShaderMaterial {
 
         CommonMaterial.setDefineMapping(this, 'PNTS_MODE', PNTS_MODE);
         CommonMaterial.setDefineMapping(this, 'PNTS_SHAPE', PNTS_SHAPE);
+        CommonMaterial.setDefineMapping(this, 'PNTS_SIZE', PNTS_SIZE);
 
         CommonMaterial.setUniformProperty(this, 'size', size);
         CommonMaterial.setUniformProperty(this, 'mode', mode);
@@ -107,6 +122,10 @@ class PointsMaterial extends THREE.RawShaderMaterial {
         CommonMaterial.setUniformProperty(this, 'overlayColor', options.overlayColor || new THREE.Vector4(0, 0, 0, 0));
         CommonMaterial.setUniformProperty(this, 'intensityRange', intensityRange);
         CommonMaterial.setUniformProperty(this, 'applyOpacityClassication', applyOpacityClassication);
+        CommonMaterial.setUniformProperty(this, 'sizeMode', sizeMode);
+        CommonMaterial.setUniformProperty(this, 'preSSE', 1.0);
+        CommonMaterial.setUniformProperty(this, 'minAttenuateSize', minAttenuateSize);
+        CommonMaterial.setUniformProperty(this, 'maxAttenuateSize', maxAttenuateSize);
 
         // add classification texture to apply classification lut.
         const data = new Uint8Array(256 * 4);
@@ -225,6 +244,10 @@ class PointsMaterial extends THREE.RawShaderMaterial {
         this.size = source.size;
         this.mode = source.mode;
         this.pntsShape = source.pntsShape;
+        this.sizeMode = source.sizeMode;
+        this.adaptiveScale = source.adaptiveScale;
+        this.minAttenuateSize = source.minAttenuateSize;
+        this.maxAttenuateSize = source.maxAttenuateSize;
         this.picking = source.picking;
         this.scale = source.scale;
         this.overlayColor.copy(source.overlayColor);
