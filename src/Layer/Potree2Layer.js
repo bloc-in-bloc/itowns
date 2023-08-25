@@ -158,11 +158,12 @@ class Potree2Layer extends PointCloudLayer {
             this.pointAttributes = parseAttributes(metadata.attributes);
             this.spacing = metadata.spacing;
 
+            /*
             const normal = Array.isArray(this.pointAttributes.attributes) &&
                this.pointAttributes.attributes.find(elem => elem.name.startsWith('NORMAL'));
             if (normal) {
                 this.material.defines[normal.name] = 1;
-            }
+            } */
 
             const min = new THREE.Vector3(...metadata.boundingBox.min);
             const max = new THREE.Vector3(...metadata.boundingBox.max);

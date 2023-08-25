@@ -45,6 +45,7 @@
             <script src="https://unpkg.com/three@0.124.0/examples/js/controls/OrbitControls.js"></script>
             <script type="text/javascript">
                 var potreeLayer;
+                var potree2Layer;
                 var oldPostUpdate;
                 var viewerDiv;
                 var debugGui;
@@ -56,7 +57,7 @@
                 CameraControls.install( { THREE: THREE } );
 
                 // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
-                itowns.proj4.defs('EPSG:3946', '+proj=lcc +lat_1=45.25 +lat_2=46.75 +lat_0=46 +lon_0=3 +x_0=1700000 +y_0=5200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+                itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
 
                 viewerDiv = document.getElementById('viewerDiv');
                 viewerDiv.style.display = 'block';
@@ -92,7 +93,7 @@
                 var rendererSize = customRenderer.getSize(new THREE.Vector2());
                 var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 1, 10000);
                 scene.add(customCamera);
-                view = new itowns.View('EPSG:3946', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene });
+                view = new itowns.View('EPSG:3947', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene });
                 view.mainLoop.gfxEngine.renderer.setClearColor(0x000000, 0);
                 view.mainLoop.gfxEngine.label2dRenderer.domElement.style.pointerEvents = 'none';
 
@@ -104,41 +105,44 @@
                 });
 
                 // Configure Point Cloud layer
-                potreeLayer = new itowns.Potree2Layer('Lion', {
+                potreeLayer = new itowns.Potree2Layer('Geosnap 1', {
                     source: new itowns.Potree2Source({
                         file: 'metadata.json',
-                        url: 'https://blocinbloc-public-test.s3.fr-par.scw.cloud/lion-potree2',
+                        url: 'http://127.0.0.1:8081/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-001.las_converted',
                         crs: view.referenceCrs,
                     }),
                     material : {
-                        minAdaptiveSize: 6,
+                        minAdaptiveSize: 3,
                         maxAdaptiveSize: 10,
-                        adaptiveScale: 2
+                        adaptiveScale: 1
+                    },
+                    pointSize: 0
+                });
+
+                potree2Layer = new itowns.Potree2Layer('Geosnap 2', {
+                    source: new itowns.Potree2Source({
+                        file: 'metadata.json',
+                        url: 'http://127.0.0.1:8081/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-002.las_converted',
+                        crs: view.referenceCrs,
+                    }),
+                    material : {
+                        minAdaptiveSize: 3,
+                        maxAdaptiveSize: 10,
+                        adaptiveScale: 1
                     },
                     pointSize: 0
                 });
 
                 // add potreeLayer to scene
                 function onLayerReady() {
-                    const gridHelper = new THREE.GridHelper( 50, 50 );
-                    gridHelper.position.y = - 1;
-                    view.scene.add( gridHelper );
-
-                    const axesHelper = new THREE.AxesHelper( 5 );
-                    view.scene.add( axesHelper );
-
                     var center = new itowns.THREE.Vector3();
                     var size = new itowns.THREE.Vector3();
 
                     potreeLayer.root.bbox.getSize(size);
                     potreeLayer.root.bbox.getCenter(center);
 
-                    /// const box = new THREE.Box3();
-                    // box.setFromCenterAndSize(center, size);
-                    // const helper = new THREE.Box3Helper(box, new THREE.Color(0xff0000));
-                    // view.scene.add(helper);
-
                     debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
+                    debug.PotreeDebug.initTools(view, potree2Layer, debugGui);
 
                     customCamera.far = 2.0 * size.length();
 
@@ -167,7 +171,7 @@
                 }
 
                 window.view = view;
-                view.addLayer(potreeLayer).then(onLayerReady);
+                Promise.all([view.addLayer(potreeLayer), view.addLayer(potree2Layer)]).then(onLayerReady);
             </script>
     </body>
 </html>
