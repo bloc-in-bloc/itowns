@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import View from 'Core/View';
 import GeometryLayer from 'Layer/GeometryLayer';
+import { PNTS_SHAPE } from 'Renderer/PointsMaterial';
 import GeometryDebug from './GeometryDebug';
 import OBBHelper from './OBBHelper';
 
@@ -110,6 +111,10 @@ export default function create3dTilesDebugUI(datDebugTool, view, _3dTileslayer) 
 
     // The sse Threshold for each tile
     gui.add(_3dTileslayer, 'sseThreshold', 0, 100).name('sseThreshold').onChange(() => {
+        view.notifyChange(view.camera.camera3D);
+    });
+
+    gui.add(_3dTileslayer, 'pntsShape', PNTS_SHAPE).name('Points Shape').onChange(() => {
         view.notifyChange(view.camera.camera3D);
     });
 }
