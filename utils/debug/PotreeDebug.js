@@ -1,4 +1,4 @@
-import { PNTS_MODE, PNTS_SHAPE } from 'Renderer/PointsMaterial';
+import { PNTS_MODE, PNTS_SHAPE, PNTS_SIZE } from 'Renderer/PointsMaterial';
 
 export default {
     initTools(view, layer, datUi) {
@@ -29,6 +29,14 @@ export default {
         }
         styleUI.add(layer, 'opacity', 0, 1).name('Layer Opacity').onChange(update);
         styleUI.add(layer, 'pointSize', 0, 15).name('Point Size').onChange(update);
+        if (layer.material.sizeMode != undefined) {
+            styleUI.add(layer.material, 'sizeMode', PNTS_SIZE).name('Point size mode').onChange(() => {
+                if (layer.material.sizeMode == PNTS_SIZE.ADAPTIVE) {
+                    layer.pointSize = 0;
+                }
+                update();
+            });
+        }
         styleUI.add(layer.material, 'adaptiveScale', 0, 15).name('Adaptive scale').onChange(update);
         styleUI.add(layer.material, 'minAdaptiveSize', 0, 15).name('Min adaptive size').onChange(update);
         styleUI.add(layer.material, 'maxAdaptiveSize', 0, 15).name('Max adaptive size').onChange(update);

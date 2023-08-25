@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import View from 'Core/View';
 import GeometryLayer from 'Layer/GeometryLayer';
-import { PNTS_SHAPE } from 'Renderer/PointsMaterial';
+import { PNTS_SHAPE, PNTS_SIZE } from 'Renderer/PointsMaterial';
 import GeometryDebug from './GeometryDebug';
 import OBBHelper from './OBBHelper';
 
@@ -115,6 +115,22 @@ export default function create3dTilesDebugUI(datDebugTool, view, _3dTileslayer) 
     });
 
     gui.add(_3dTileslayer, 'pntsShape', PNTS_SHAPE).name('Points Shape').onChange(() => {
+        view.notifyChange(view.camera.camera3D);
+    });
+
+    gui.add(_3dTileslayer, 'pntsSize', PNTS_SIZE).name('Pnts size mode').onChange(() => {
+        view.notifyChange(view.camera.camera3D);
+    });
+
+    gui.add(_3dTileslayer, 'pntsAdaptiveScale', 0, 15).name('Adptive scale').onChange(() => {
+        view.notifyChange(view.camera.camera3D);
+    });
+
+    gui.add(_3dTileslayer, 'pntsMinAdaptiveSize', 0, 15).name('Min adptive size').onChange(() => {
+        view.notifyChange(view.camera.camera3D);
+    });
+
+    gui.add(_3dTileslayer, 'pntsMaxAdaptiveSize', 0, 15).name('Max adptive size').onChange(() => {
         view.notifyChange(view.camera.camera3D);
     });
 }
