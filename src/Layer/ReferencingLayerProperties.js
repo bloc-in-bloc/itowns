@@ -21,6 +21,11 @@ function ReferLayerProperties(material, layer) {
                 get: () => material.layer.pntsMode,
             });
         }
+        if (material.uniforms && material.uniforms.shape != undefined) {
+            Object.defineProperty(material.uniforms.shape, 'value', {
+                get: () => material.layer.pntsShape,
+            });
+        }
 
         Object.defineProperty(material, 'wireframe', {
             get: () => material.layer.wireframe,

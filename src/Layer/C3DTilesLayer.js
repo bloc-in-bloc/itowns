@@ -3,7 +3,7 @@ import GeometryLayer from 'Layer/GeometryLayer';
 import { init3dTilesLayer, pre3dTilesUpdate, process3dTilesNode } from 'Process/3dTilesProcessing';
 import C3DTileset from 'Core/3DTiles/C3DTileset';
 import C3DTExtensions from 'Core/3DTiles/C3DTExtensions';
-import { PNTS_MODE } from 'Renderer/PointsMaterial';
+import { PNTS_MODE, PNTS_SHAPE } from 'Renderer/PointsMaterial';
 // eslint-disable-next-line no-unused-vars
 import Style from 'Core/Style';
 import C3DTFeature from 'Core/3DTiles/C3DTFeature';
@@ -70,6 +70,7 @@ class C3DTilesLayer extends GeometryLayer {
      * removed from the scene.
      * @param {C3DTExtensions} [config.registeredExtensions] 3D Tiles extensions managers registered for this tileset.
      * @param {String} [config.pntsMode= PNTS_MODE.COLOR] {@link PointsMaterials} Point cloud coloring mode. Only 'COLOR' or 'CLASSIFICATION' are possible. COLOR uses RGB colors of the points, CLASSIFICATION uses a classification property of the batch table to color points.
+     * @param {String} [config.pntsShape= PNTS_SHAPE.CIRCLE] Point cloud point shape. Only 'CIRCLE' or 'SQUARE' are possible.
      * @param {Style} [config.style=null] - style used for this layer
      * @param  {View}  view  The view
      */
@@ -83,12 +84,26 @@ class C3DTilesLayer extends GeometryLayer {
         this.registeredExtensions = config.registeredExtensions || new C3DTExtensions();
 
         this.pntsMode = PNTS_MODE.COLOR;
+        this.pntsShape = PNTS_SHAPE.CIRCLE;
         this.classification = config.classification;
 
 
         if (config.pntsMode) {
             const exists = Object.values(PNTS_MODE).includes(config.pntsMode);
-            if (!exists) { console.warn("The points cloud mode doesn't exist. Use 'COLOR' or 'CLASSIFICATION' instead."); } else { this.pntsMode = config.pntsMode; }
+            if (!exists) {
+                console.warn("The points cloud mode doesn't exist. Use 'COLOR' or 'CLASSIFICATION' instead.");
+            } else {
+                this.pntsMode = config.pntsMode;
+            }
+        }
+
+        if (config.pntsShape) {
+            const exists = Object.values(PNTS_SHAPE).includes(config.pntsShape);
+            if (!exists) {
+                console.warn("The points cloud point shape doesn't exist. Use 'CIRCLE' or 'SQUARE' instead.");
+            } else {
+                this.pntsShape = config.pntsShape;
+            }
         }
 
 

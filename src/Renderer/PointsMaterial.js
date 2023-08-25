@@ -224,6 +224,7 @@ class PointsMaterial extends THREE.RawShaderMaterial {
         this.transparent = source.transparent;
         this.size = source.size;
         this.mode = source.mode;
+        this.pntsShape = source.pntsShape;
         this.picking = source.picking;
         this.scale = source.scale;
         this.overlayColor.copy(source.overlayColor);
