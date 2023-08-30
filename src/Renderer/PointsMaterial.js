@@ -88,7 +88,7 @@ class PointsMaterial extends THREE.RawShaderMaterial {
         const applyOpacityClassication = options.applyOpacityClassication == undefined ? false : options.applyOpacityClassication;
         const size = options.size || 0;
         const mode = options.mode || PNTS_MODE.COLOR;
-		const shape = options.shape || PNTS_SHAPE.CIRCLE;
+        const shape = options.shape || PNTS_SHAPE.CIRCLE;
         const sizeMode = size === 0 ? PNTS_SIZE.ATTENUATE : (options.sizeMode || PNTS_SIZE.VALUE);
         const minAttenuateSize = options.minAttenuateSize || 3;
         const maxAttenuateSize = options.maxAttenuateSize || 10;
@@ -99,7 +99,7 @@ class PointsMaterial extends THREE.RawShaderMaterial {
         delete options.applyOpacityClassication;
         delete options.size;
         delete options.mode;
-		delete options.shape;
+        delete options.shape;
         delete options.sizeMode;
         delete options.minAttenuateSize;
         delete options.maxAttenuateSize;

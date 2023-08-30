@@ -125,7 +125,7 @@ export default function create3dTilesDebugUI(datDebugTool, view, _3dTileslayer) 
     gui.add(_3dTileslayer, 'pntsMaxAttenuateSize', 0, 15).name('Max attenuate size').onChange(() => {
         view.notifyChange(view.camera.camera3D);
     });
-	gui.add(_3dTileslayer, 'pntsShape', PNTS_SHAPE).name('Points Shape').onChange(() => {
+    gui.add(_3dTileslayer, 'pntsShape', PNTS_SHAPE).name('Points Shape').onChange(() => {
         view.notifyChange(view.camera.camera3D);
     });
 }
