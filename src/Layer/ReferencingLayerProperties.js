@@ -36,7 +36,7 @@ function ReferLayerProperties(material, layer) {
                 get: () => material.layer.pntsMaxAttenuateSize,
             });
         }
-		if (material.uniforms && material.uniforms.shape != undefined) {
+        if (material.uniforms && material.uniforms.shape != undefined) {
             Object.defineProperty(material.uniforms.shape, 'value', {
                 get: () => material.layer.pntsShape,
             });

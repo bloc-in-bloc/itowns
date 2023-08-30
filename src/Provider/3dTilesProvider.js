@@ -32,7 +32,7 @@ function pntsParse(data, layer) {
             new PointsMaterial({
                 size: 0.05,
                 mode: layer.pntsMode,
-				shape: layer.pntsShape,
+                shape: layer.pntsShape,
                 classification: layer.classification,
                 sizeMode: layer.pntsSize,
                 minAttenuateSize: layer.pntsMinAttenuateSize,
