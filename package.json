@@ -1,6 +1,6 @@
 {
   "name": "@bloc-in-bloc/itowns",
-  "version": "2.40.4-next.6",
+  "version": "2.40.4-next.7",
   "description": "A JS/WebGL framework for 3D geospatial data visualization",
   "main": "lib/Main.js",
   "exports": {
