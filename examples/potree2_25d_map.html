@@ -89,13 +89,27 @@
                     return renderer;
                 }
 
+                var placement = {
+                    coord: new itowns.Coordinates('EPSG:4326', 4.9586957, 46.7836746, 208.9362),
+                    range: 3000,
+                    tilt: 55,
+                    heading: 180
+                }
+
                 var customRenderer = createRenderer();
                 var rendererSize = customRenderer.getSize(new THREE.Vector2());
                 var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 1, 10000);
                 scene.add(customCamera);
-                view = new itowns.View('EPSG:3947', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene });
+                var globeView = new itowns.GlobeView(viewerDiv, placement, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene, noControls: true });
+                var view = new itowns.View('EPSG:3947', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene });
                 view.mainLoop.gfxEngine.renderer.setClearColor(0x000000, 0);
                 view.mainLoop.gfxEngine.label2dRenderer.domElement.style.pointerEvents = 'none';
+
+                itowns.Fetcher.json('./layers/JSONLayers/OPENSM.json').then(function _(config) {
+                    config.source = new itowns.TMSSource(config.source);
+                    var layer = new itowns.ColorLayer('Ortho', config);
+                    globeView.addLayer(layer);
+                });
 
                 customRenderer.domElement.addEventListener("mousedown", (event) => {
                     const result = view.pickObjectsAt(event, 10);
@@ -108,29 +122,17 @@
                 potreeLayer = new itowns.Potree2Layer('Geosnap 1', {
                     source: new itowns.Potree2Source({
                         file: 'metadata.json',
-                        url: 'http://127.0.0.1:8081/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-001.las_converted',
+                        url: 'http://127.0.0.1:8080/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-001.las_converted',
                         crs: view.referenceCrs,
                     }),
-                    material : {
-                        minAdaptiveSize: 3,
-                        maxAdaptiveSize: 10,
-                        adaptiveScale: 1
-                    },
-                    pointSize: 0
                 });
 
                 potree2Layer = new itowns.Potree2Layer('Geosnap 2', {
                     source: new itowns.Potree2Source({
                         file: 'metadata.json',
-                        url: 'http://127.0.0.1:8081/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-002.las_converted',
+                        url: 'http://127.0.0.1:8080/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-002.las_converted',
                         crs: view.referenceCrs,
                     }),
-                    material : {
-                        minAdaptiveSize: 3,
-                        maxAdaptiveSize: 10,
-                        adaptiveScale: 1
-                    },
-                    pointSize: 0
                 });
 
                 // add potreeLayer to scene

@@ -49,7 +49,7 @@
             debugGui = new dat.GUI();
 
             var placement = {
-                coord: new itowns.Coordinates('EPSG:4326',  4.631512, 43.675626),
+                coord: new itowns.Coordinates('EPSG:4326', 4.9586957, 46.7836746),
                 range: 100,
                 tilt: 45,
                 heading: -60
@@ -61,10 +61,10 @@
             view.controls.minDistance = 50;
 
             // Configure Point Cloud layer
-            potreeLayer = new itowns.PotreeLayer('eglise_saint_blaise_arles', {
-                source: new itowns.PotreeSource({
-                    file: 'eglise_saint_blaise_arles.js',
-                    url: 'https://raw.githubusercontent.com/gmaillet/dataset/master/',
+            potreeLayer = new itowns.Potree2Layer('Geosnap 1', {
+                source: new itowns.Potree2Source({
+                    file: 'metadata.json',
+                    url: 'http://127.0.0.1:8080/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-001.las_converted',
                     crs: view.referenceCrs,
                 }),
             });
