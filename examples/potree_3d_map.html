@@ -49,7 +49,7 @@
             debugGui = new dat.GUI();
 
             var placement = {
-                coord: new itowns.Coordinates('EPSG:4326', 4.9586957, 46.7836746),
+                coord: new itowns.Coordinates('EPSG:4326', 4.9586957, 46.7836746, 208.9362),
                 range: 100,
                 tilt: 45,
                 heading: -60
@@ -61,10 +61,10 @@
             view.controls.minDistance = 50;
 
             // Configure Point Cloud layer
-            potreeLayer = new itowns.Potree2Layer('Geosnap 1', {
-                source: new itowns.Potree2Source({
-                    file: 'metadata.json',
-                    url: 'http://127.0.0.1:8080/GEOSNAP-MISSION-4519-RGF93-CC47-nuage-001.las_converted',
+            potreeLayer = new itowns.PotreeLayer('Geosnap 1', {
+                source: new itowns.PotreeSource({
+                    file: 'cloud.js',
+                    url: 'http://127.0.0.1:8081/GEOSNAP-4326',
                     crs: view.referenceCrs,
                 }),
             });
@@ -83,11 +83,13 @@
 
             itowns.View.prototype.addLayer.call(view, potreeLayer).then(onLayerReady);
 
+            /*
             itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(function _(config) {
                 config.source = new itowns.WMTSSource(config.source);
                 var layer = new itowns.ElevationLayer(config.id, config);
                 view.addLayer(layer);
             });
+            */
             itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(function _(config) {
                 config.source = new itowns.WMTSSource(config.source);
                 var layer = new itowns.ColorLayer(config.id, config);
