@@ -48,11 +48,8 @@
 
             debugGui = new dat.GUI();
 
-            // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
-            itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
-
             var placement = {
-                coord: new itowns.Coordinates('EPSG:3947', 1351190.537, 6240402.554, 52.429),
+                coord: new itowns.Coordinates('EPSG:4326', -1.612590, 47.271047, 52.429),
                 range: 100,
                 tilt: 45,
                 heading: -60
