@@ -89,8 +89,9 @@
                     return renderer;
                 }
 
+                // 1351190.537 6240402.554 52.429
                 var placement = {
-                    coord: new itowns.Coordinates('EPSG:4326', 4.9586957, 46.7836746),
+                    coord: new itowns.Coordinates('EPSG:3947', 1351190.537, 6240402.554, 52.429),
                     range: 100,
                     tilt: 45,
                     heading: -60
@@ -101,9 +102,9 @@
                 var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 1, 10000);
                 scene.add(customCamera);
                 var globeView = new itowns.GlobeView(viewerDiv, placement, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene, noControls: true });
-                var view = new itowns.View('EPSG:4326', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene });
-                view.mainLoop.gfxEngine.renderer.setClearColor(0x000000, 0);
-                view.mainLoop.gfxEngine.label2dRenderer.domElement.style.pointerEvents = 'none';
+                // var view = new itowns.View('EPSG:3947', viewerDiv, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene });
+                // view.mainLoop.gfxEngine.renderer.setClearColor(0x000000, 0);
+                // view.mainLoop.gfxEngine.label2dRenderer.domElement.style.pointerEvents = 'none';
 
                 // globeView.controls.minDistance = 50;
 
@@ -132,8 +133,8 @@
                 potreeLayer = new itowns.PotreeLayer('Geosnap 1', {
                     source: new itowns.PotreeSource({
                         file: 'cloud.js',
-                        url: 'http://127.0.0.1:8081/GEOSNAP-4326',
-                        crs: view.referenceCrs,
+                        url: 'http://127.0.0.1:8080',
+                        crs: globeView.referenceCrs,
                     }),
                 });
 
@@ -145,7 +146,7 @@
                     potreeLayer.root.bbox.getSize(size);
                     potreeLayer.root.bbox.getCenter(center);
 
-                    debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
+                    // debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
                     // debug.PotreeDebug.initTools(view, potree2Layer, debugGui);
 
                     customCamera.far = 2.0 * size.length();
@@ -156,10 +157,12 @@
                     controls.rotateTo(DEG90, DEG90, false );
 
                     // update stats window
+                    /*
                     var info = document.getElementById('info');
                     view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_RENDER, () => {
                         info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
                     });
+                    */
 
                     animate();
                 }
@@ -168,14 +171,14 @@
                     const delta = clock.getDelta();
                     const updated = controls.update( delta );
                     if (updated) {
-                        view.notifyChange(customCamera);
+                        // iew.notifyChange(customCamera);
                     }
                     customRenderer.render(scene, customCamera);
                     requestAnimationFrame( animate );
                 }
 
-                window.view = view;
-                Promise.all([view.addLayer(potreeLayer)]).then(onLayerReady);
+                window.view = globeView;
+                Promise.all([globeView.addLayer(potreeLayer)]).then(onLayerReady);
             </script>
     </body>
 </html>
