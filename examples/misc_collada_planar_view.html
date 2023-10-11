@@ -1,0 +1,112 @@
+<html>
+    <head>
+        <title>Itowns - collada</title>
+
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+
+        <!-- Import iTowns source code -->
+        <script src="../dist/itowns.js"></script>
+        <script src="../dist/debug.js"></script>
+
+        <!-- Import iTowns LoadingScreen and GuiTools plugins -->
+        <script src="js/GUI/GuiTools.js"></script>
+        <script src="js/GUI/LoadingScreen.js"></script>
+
+        <script type="text/javascript">
+
+
+            // ---------- CREATE A PlanarView FOR SUPPORTING DATA VISUALIZATION : ----------
+
+            itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+            itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
+            // Define camera initial position
+            const size = 200;
+            const viewExtent = new itowns.Extent(
+                'EPSG:3947',
+                1351190.5369999579 - size, 1351190.5369999579 + size,
+                6240402.553999971 - size, 6240402.553999971 + size,
+            );
+
+            // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
+            const viewerDiv = document.getElementById('viewerDiv');
+
+            // Create a PlanarView
+            const view = new itowns.PlanarView(viewerDiv, viewExtent, { placement: { range: 100, heading: 180, tilt: 60, }});
+
+            const sun = new itowns.THREE.DirectionalLight(0xFFFFFF);
+            sun.position.set(-0.5, 0, 1);
+            sun.updateMatrixWorld(true);
+            view.scene.add(sun);
+
+            // Setup loading screen and debug menu
+            setupLoadingScreen(viewerDiv, view);
+            const debugMenu = new GuiTools('menuDiv', view);
+
+            // ---------- DISPLAY CONTEXTUAL DATA : ----------
+
+            // Display ortho-images
+            const sourceMap = new itowns.WMSSource({
+                url: "https://data.geopf.fr/wms-r",
+                name: "OI.OrthoimageCoverage.HR",
+                format: "image/png",
+                crs: 'EPSG:2154',
+                extent: viewExtent
+            });
+            const layerOrtho = new itowns.ColorLayer('OPENSM', { source: sourceMap, });
+            view.addLayer(layerOrtho).then(debugMenu.addLayerGUI.bind(debugMenu));
+
+            // Define the source of the dem data
+            const sourceDEM = new itowns.WMSSource({
+                url: "https://data.geopf.fr/wms-r",
+                name: "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES",
+                format: "image/x-bil;bits=32",
+                crs: 'EPSG:2154',
+                extent: viewExtent,
+            });
+            // Create the dem ElevationLayer and add it to the view
+            const layerDEM = new itowns.ElevationLayer('Elevation', { source: sourceDEM });
+            view.addLayer(layerDEM).then(debugMenu.addLayerGUI.bind(debugMenu));
+
+
+            // ---------- DISPLAY COLLADA DATA : ----------
+
+            // ThreeLoader can load each format proposed in ThreeJs examples loaders :
+            // https://github.com/mrdoob/three.js/tree/dev/examples/js/loaders
+            // Note : As this previous folder has been removed in three r148,
+            // TheeLoader will only use loaders from three r147 version. This
+            // is a temporary solution and shall be updated.
+            itowns.enableDracoLoader("./libs/draco/");
+            itowns.glTFLoader.load('https://blocinbloc-public-test.s3.fr-par.scw.cloud/batiment-orvault-cc47.glb',
+                collada => {
+                    const model = collada.scene;
+
+                    // building coordinate
+                    const coord = new itowns.Coordinates('EPSG:3947', 1351152.118201931, 6240395.0059363097, 61.329999999999998);
+
+                    model.position.copy(coord.as(view.referenceCrs));
+                    // align up vector with geodesic normal
+                    model.lookAt(model.position.clone().add(coord.geodesicNormal));
+                    // user rotate building to align with ortho image
+                    model.rotateX(90 * itowns.THREE.MathUtils.DEG2RAD);
+                    model.rotateY(-90 * itowns.THREE.MathUtils.DEG2RAD);
+
+                    // update coordinate of the mesh
+                    model.updateMatrixWorld();
+
+                    view.scene.add(model);
+                    view.notifyChange();
+                });
+
+        </script>
+    </body>
+</html>

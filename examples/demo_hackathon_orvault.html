@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Point Cloud on globe</title>
+
+        <style type="text/css">
+            #info {
+                color: #7ad7ff;
+                font-family: 'Open Sans', sans-serif;
+                position: absolute;
+                top: 0;
+                left: 0;
+                padding: 0.3rem;
+                background-color: #404040;
+                z-index: 1;
+            }
+
+            @media (max-width: 600px) {
+                #info,
+                .dg {
+                    display: none;
+                }
+            }
+        </style>
+
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+        <div id="info"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+        <script src="../dist/itowns.js"></script>
+        <script src="js/GUI/LoadingScreen.js"></script>
+        <script src="../dist/debug.js"></script>
+        <script src="js/GUI/GuiTools.js"></script>
+        <script src="https://unpkg.com/camera-controls@2.7.2/dist/camera-controls.js"></script>
+        <script type="text/javascript">
+            window.THREE = itowns.THREE;
+        </script>
+        <script type="text/javascript">
+            var potreeLayer;
+            var oldPostUpdate;
+            var viewerDiv;
+            var debugGui;
+            var view;
+            var controls;
+            var clock = new THREE.Clock();
+            var scene = new THREE.Scene();
+            var cameraUp;
+
+            CameraControls.install( { THREE: THREE } );
+
+            viewerDiv = document.getElementById('viewerDiv');
+            viewerDiv.style.display = 'block';
+
+            debugGui = new dat.GUI();
+
+            // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
+            itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+            itowns.proj4.defs('EPSG:4978', '+proj=geocent +datum=WGS84 +ellps=GRS80 +units=m +vunits=m +no_defs +type=crs');
+            itowns.proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
+
+            var placement = {
+                coord: new itowns.Coordinates('EPSG:3947', 1351190.537, 6240402.554, 52.429),
+                range: 100,
+                tilt: 0,
+                heading: 0
+            }
+
+            function createRenderer() {
+                const renderer = new THREE.WebGLRenderer({
+                    alpha: true,
+                    antialias: true,
+                    powerPreference: "high-performance",
+                    preserveDrawingBuffer: true
+                });
+                renderer.setSize(viewerDiv.clientWidth, viewerDiv.clientHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.info.autoReset = false;
+
+                // Improve color rendering
+                renderer.localClippingEnabled = true;
+                renderer.setClearColor(0x000000, 0);
+
+                // Increase start-up time to render
+                const pmremGenerator = new THREE.PMREMGenerator(renderer);
+                pmremGenerator.compileEquirectangularShader();
+
+                viewerDiv.appendChild(renderer.domElement);
+
+                return renderer;
+            }
+
+            var customRenderer = createRenderer();
+            var rendererSize = customRenderer.getSize(new THREE.Vector2());
+            var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 0.1, 1000);
+            scene.add(customCamera);
+
+            view = new itowns.GlobeView(viewerDiv, placement, { camera: { cameraThree: customCamera }, renderer: customRenderer, scene3D: scene, noControls: true });
+            setupLoadingScreen(viewerDiv, view);
+
+            // Configure Point Cloud layer
+            potreeLayer = new itowns.PotreeLayer('Points cloud', {
+                source: new itowns.PotreeSource({
+                    file: 'cloud.js',
+                    url: 'https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/OrvaultCC47_Potree1_7_4978',
+                    crs: 'EPSG:4978',
+                }),
+            });
+
+            window.view = view;
+
+            var elevationLayer;
+            itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(function _(config) {
+                config.source = new itowns.WMTSSource(config.source);
+                elevationLayer = new itowns.ElevationLayer(config.id, config);
+                view.addLayer(elevationLayer);
+            });
+
+            var colorLayer;
+            itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(function _(config) {
+                config.source = new itowns.WMTSSource(config.source);
+                colorLayer = new itowns.ColorLayer(config.id, config);
+                view.addLayer(colorLayer);
+            });
+
+            function loadIfc() {
+                itowns.enableDracoLoader("./libs/draco/");
+                itowns.glTFLoader.load(
+                    'https://blocinbloc-public-test.s3.fr-par.scw.cloud/batiment-orvault-cc47.glb', (glb) => {
+                        const model = glb.scene;
+                        model.name = 'model'
+
+                        // building coordinate
+                        const coord = new itowns.Coordinates(
+                            'EPSG:3947',1351152.118201931,6240395.0059363097, 61.329999999999998
+                        );
+
+                        model.position.copy(coord.as(view.referenceCrs));
+
+                        model.lookAt(cameraUp);
+                        model.rotateX(-90 * THREE.MathUtils.DEG2RAD);
+                        model.rotateY(180 * THREE.MathUtils.DEG2RAD);
+
+                        // update coordinate of the mesh
+                        model.updateMatrixWorld();
+
+                        view.scene.add(model);
+                        view.notifyChange();
+                    });
+            }
+
+            // add potreeLayer to scene
+            function onLayerReady() {
+                debug.PointCloudDebug.initTools(view, potreeLayer, debugGui);
+
+                const menuGlobe = new GuiTools('menuDiv', view);
+                menuGlobe.addImageryLayersGUI([colorLayer]);
+                menuGlobe.addElevationLayerGUI(elevationLayer);
+
+                controls = new CameraControls(customCamera, viewerDiv);
+                const boundingSphere = potreeLayer.root.bbox.getBoundingSphere(new THREE.Sphere());
+                controls.fitToSphere(boundingSphere, false);
+                controls.rotate( 0, 90 * THREE.MathUtils.DEG2RAD, false );
+                animate();
+                controls.applyCameraUp();
+                cameraUp = customCamera.up.clone();
+
+                loadIfc();
+
+                // update stats window
+                var info = document.getElementById('info');
+                view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_RENDER, () => {
+                    info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
+                });
+
+                animate();
+            }
+
+            function animate() {
+                const delta = clock.getDelta();
+                const updated = controls.update( delta );
+                if (updated) {
+                    view.notifyChange(customCamera);
+                }
+                requestAnimationFrame( animate );
+            }
+
+            // Handle fetching step.
+            // Should you implement a custom fetcher, it would need to be called here.
+            itowns.Fetcher.json(
+                'https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/orvault.geojson',
+            ).then((fetched) => {
+                // Handle parsing step.
+                // We parse the fetched data into a FeatureCollection.
+                // See http://www.itowns-project.org/itowns/docs/#api/Base/FeatureCollection.
+                // Should you implement a custom parser, it would need to be called here.
+                return itowns.GeoJsonParser.parse(fetched, {
+                    // Information on the fetched data.
+                    // See http://www.itowns-project.org/itowns/docs/#api/Source/ParsingOptions.
+                    in: {
+                        crs: 'EPSG:4326',
+                    },
+                    // Information on the FeatureCollection that should be created from the fetched data. Here, we pass a
+                    // FeatureBuildingOptions (http://www.itowns-project.org/itowns/docs/#api/Base/FeatureBuildingOptions).
+                    out: {
+                        crs: view.tileLayer.extent.crs,
+                    },
+                });
+            }).then((parsed) => {
+                // Finally, define a FileSource from the parsed data
+                const sourceFromParsedData = new itowns.FileSource({ features: parsed });
+
+                view.addLayer(new itowns.ColorLayer('Orvault', {
+                    source: sourceFromParsedData,
+                    style: {
+                        stroke: { color: 'red', width: 2 },
+                    },
+                }));
+            });
+
+            itowns.View.prototype.addLayer.call(view, potreeLayer).then(onLayerReady);
+        </script>
+    </body>
+</html>
+
