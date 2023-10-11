@@ -371,6 +371,7 @@ class View extends THREE.EventDispatcher {
         }
 
         if (layer.object3d && !layer.object3d.parent && layer.object3d !== this.scene) {
+            layer.object3d.name = 'layer';
             this.scene.add(layer.object3d);
         }
 

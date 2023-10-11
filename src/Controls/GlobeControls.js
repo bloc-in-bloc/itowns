@@ -301,6 +301,7 @@ class GlobeControls extends THREE.EventDispatcher {
         this.states.addEventListener(this.states.TRAVEL_IN._event, this._onTravel, false);
         this.states.addEventListener(this.states.TRAVEL_OUT._event, this._onTravel, false);
 
+        cameraTarget.name = 'cameratarget';
         view.scene.add(cameraTarget);
         if (enableTargetHelper) {
             cameraTarget.add(helpers.target);
