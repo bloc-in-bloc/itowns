@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>iTowns - Enhanced Layer Control</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="css/example.css">
+    <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+    <link rel="stylesheet" type="text/css" href="css/widgets.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+<div id="viewerDiv" class="viewer"></div>
+<div id="description">
+    <p><b>Point Cloud information</b></p>
+    <ul id="info"></ul>
+    <p><b>WFS information</b></p>
+    <ul id="infoBuilding"></ul>
+</div>
+
+<script type="importmap">
+    {
+        "imports": {
+            "itowns": "../dist/itowns.js",
+            "debug": "../dist/debug.js",
+            "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+            "LoadingScreen": "./jsm/GUI/LoadingScreen.js",
+            "itowns_widgets": "../dist/itowns_widgets.js",
+            "dat": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import * as itowns from 'itowns';
+    import dat from 'dat';
+
+    var color = new THREE.Color();
+    var tile;
+
+    // Initialize iTowns viewer and extent
+    itowns.CRS.defs('EPSG:3946', '+proj=lcc +lat_1=45.25 +lat_2=46.75 +lat_0=46 +lon_0=3 +x_0=1700000 +y_0=5200000 +ellps=GRS80 +units=m +no_defs');
+    itowns.CRS.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+    itowns.CRS.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
+
+    const extent = new itowns.Extent(
+        'EPSG:3946',
+        1840816.94334, 1843692.32501,
+        5175036.4587, 5177412.82698
+    );
+    const viewerDiv = document.getElementById('viewerDiv');
+
+    const view = new itowns.PlanarView(viewerDiv, extent, { maxSubdivisionLevel: 20 });
+    const gui = new dat.GUI();
+    const layersGui = gui.addFolder('Layers Control');
+    const addedLayers = {};  // Track added layers for management
+
+    const sourceDEM = new itowns.WMSSource({
+        url: "https://data.geopf.fr/wms-r/wms?",
+        name: "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES",
+        format: "image/x-bil;bits=32",
+        crs: 'EPSG:2154',
+        extent: extent,
+    });
+    // Create the dem ElevationLayer and add it to the view
+    const layerDEM = new itowns.ElevationLayer('Elevation', { source: sourceDEM });
+    view.addLayer(layerDEM);
+
+    async function fetchWFSLayers(url) {
+        // Fetch and parse WMS GetCapabilities
+        const response = await fetch(url);
+        const text = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, "application/xml");
+
+        const layers = Array.from(xmlDoc.getElementsByTagName("Layer"))
+            .map(layer => ({
+            title: layer.getElementsByTagName('Title')[0]?.textContent,
+            typeName: layer.getElementsByTagName('Name')[0]?.textContent,
+            formats: 'application/json', version : '2.0.0',
+        }));
+
+        return layers;
+    }
+
+    async function fetchWMSLayers(url) {
+        // Fetch and parse WMS GetCapabilities
+        const response = await fetch(url);
+        const text = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, "application/xml");
+
+        const layers = Array.from(xmlDoc.getElementsByTagName("Layer"))
+            .map(layer => ({
+            title: layer.getElementsByTagName('Title')[0]?.textContent,
+            name: layer.getElementsByTagName('Name')[0]?.textContent,
+            formats: Array.from(layer.getElementsByTagName('Format')).map(f => f.textContent),
+            boundingBox: layer.getElementsByTagName('BoundingBox')[0]
+        }));
+
+        return layers;
+    }
+
+    async function fetchWMTSLayers(url) {
+        // Fetch GetCapabilities and parse layers
+        const response = await fetch(url);
+        const text = await response.text();
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, "application/xml");
+
+        function TileMatrixSetXMLToJson(xmlDoc) {
+            const tileMatrixSetLimits = {};
+            const tileMatrixElements = xmlDoc.getElementsByTagName('TileMatrixLimits');
+            for (let i = 0; i < tileMatrixElements.length; i++) {
+                const tileMatrix = tileMatrixElements[i];
+                const zoomLevel = tileMatrix.getElementsByTagName('TileMatrix')[0].textContent;
+                const minTileRow = parseInt(tileMatrix.getElementsByTagName('MinTileRow')[0].textContent);
+                const maxTileRow = parseInt(tileMatrix.getElementsByTagName('MaxTileRow')[0].textContent);
+                const minTileCol = parseInt(tileMatrix.getElementsByTagName('MinTileCol')[0].textContent);
+                const maxTileCol = parseInt(tileMatrix.getElementsByTagName('MaxTileCol')[0].textContent);
+
+                tileMatrixSetLimits[zoomLevel] = {
+                    minTileRow,
+                    maxTileRow,
+                    minTileCol,
+                    maxTileCol
+                };
+            }
+            return tileMatrixSetLimits;
+        }
+
+        const layers = Array.from(xmlDoc.getElementsByTagName("Layer")).map(layer => ({
+            title: layer.getElementsByTagName('Title')[0]?.textContent,
+            identifier: layer.getElementsByTagName('Identifier')[0]?.textContent,
+            format: layer.getElementsByTagName('Format')[0]?.textContent || "image/png",
+            tileMatrixSet: layer.getElementsByTagName('TileMatrixSet')[0]?.textContent,
+            tileMatrixSetLimits: TileMatrixSetXMLToJson(layer.getElementsByTagName('TileMatrixSetLimits')[0])
+        }));
+
+        // Sort layers alphabetically by title
+        return layers.sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    async function fetchLayers(url, type) {
+        switch (type) {
+            case 'WMS' :
+                return fetchWMSLayers(url);
+            case 'WMTS' :
+                return fetchWMTSLayers(url);
+            case 'WFS' :
+                return fetchWFSLayers(url);
+        }
+    }
+
+    async function initLayerSelector(defaultUrl) {
+        const controller = { url: defaultUrl, type: 'WFS' };
+        const typeOptions = ['WMTS', 'WMS', 'WFS'];
+        gui.add(controller, 'url').name("Layer URL").onFinishChange(async (newUrl) => {
+            await updateLayerSelector(newUrl, controller.type);
+        });
+        gui.add(controller, 'type', typeOptions).name("Service Type").onChange(async (newType) => {
+            await updateLayerSelector(controller.url, newType);
+        });
+        await updateLayerSelector(defaultUrl, controller.type); // Default to WMTS
+    }
+
+    async function updateLayerSelector(url, type) {
+        const layers = await fetchLayers(url, type);
+        const baseUrl = url.split('?')[0];
+        const layerOptions = { layer: layers[0].title, type: 'ColorLayer', baseUrl : baseUrl };
+        const typeOptions = ['ColorLayer', 'GeometryLayer', 'FeatureGeometryLayer', 'TiledGeometryLayer', 'PlanarLayer'];
+
+        gui.add(layerOptions, 'layer', layers.map(l => l.name + " / " + l.title)).name("Layer");
+        gui.add(layerOptions, 'type', typeOptions).name("Layer Type");
+        gui.add(layerOptions, 'baseUrl', baseUrl).name("Base URL");
+
+        const colorFormats = {
+            string: '#ffffff',
+            int: 0xffffff,
+            object: { r: 1, g: 1, b: 1 },
+            array: [ 1, 1, 1 ]
+        };
+
+        gui.addColor( colorFormats, 'string' ).onChange(( value) => {
+            color = new THREE.Color(`${value}`)
+        })
+
+        const addLayerButton = { addLayer: () => addSelectedLayer(layerOptions, layers, type) };
+        gui.add(addLayerButton, 'addLayer').name("Add Layer");
+    }
+    async function addSelectedLayer(options, layers, type) {
+        const layerInfo = layers.find(l => l.name + " / " + l.title === options.layer);
+        let layerSource = null;
+            switch (type) {
+                case'WMS' : layerSource = new itowns.WMSSource({
+                    url: options.baseUrl, //https://data.geopf.fr/wms-r
+                    name: layerInfo.name,
+                    format: layerInfo.format,
+                    crs: 'EPSG:3946',
+                    extent: extent,
+                }); break;
+                case 'WMTS' : layerSource = new itowns.WMTSSource({
+                    url: options.baseUrl,
+                    name: layerInfo.identifier,
+                    format: layerInfo.format,
+                    crs: 'EPSG:3946',
+                    extent: extent,
+                    tileMatrixSet: layerInfo.tileMatrixSet,
+                    tileMatrixSetLimits: layerInfo.tileMatrixSetLimits,
+                });
+                break;
+                case 'WFS' : layerSource = new itowns.WFSSource({
+                    url: options.baseUrl,
+                    name: layerInfo.identifier,
+                    format: layerInfo.format,
+                    typeName : layerInfo.typeName,
+                    crs: 'EPSG:4326',
+                    extent: extent,
+                    ipr : 'IGN',
+                    version : layerInfo.version,
+                });
+                break;
+            }
+            let layer;
+            switch (options.type) {
+                case 'ColorLayer':
+                    layer = new itowns.ColorLayer(layerInfo.title, {source : layerSource});
+                    break;
+                case 'GeometryLayer':
+                    layer = new itowns.GeometryLayer(layerInfo.title,  {source : layerSource});
+                    break;
+                case 'FeatureGeometryLayer':
+                    function extrudeBuildings(properties) {
+                        return properties.hauteur ?? 1;
+                    }
+
+                    function altitudeLine(properties, ctx) {
+                        var result;
+                        var z = 0;
+                        if (ctx.coordinates) {
+                            result = itowns.DEMUtils.getTerrainObjectAt(view.tileLayer, ctx.coordinates, 0, tile);
+                            if (!result) {
+                                result = itowns.DEMUtils.getTerrainObjectAt(view.tileLayer, ctx.coordinates, 0);
+                            }
+                            if (result) {
+                                tile = [result.tile];
+                                z = result.coord.z;
+                            }
+                            return z;
+                        }
+                    }
+
+                    const buildingsGroup = new THREE.Group();
+                    buildingsGroup.name = "Building groups";
+                    view.tileLayer.object3d.add(buildingsGroup);
+
+                    layer = new itowns.FeatureGeometryLayer(layerInfo.title,  {
+                        //batchId: function (property, featureId) { return featureId; },
+                        //filter: acceptFeature,
+                        crs: 'EPSG:3946',
+                        source: layerSource,
+                        object3d: buildingsGroup,
+                        style: {
+                            fill: {
+                                color : color,
+                                base_altitude : altitudeLine,
+                                extrusion_height : extrudeBuildings
+                            }
+                        }
+                    });
+                    break;
+                case 'TiledGeometryLayer':
+                    layer = new itowns.TiledGeometryLayer(layerInfo.title,  {source : layerSource});
+                    break;
+                case 'PlanarLayer':
+                    layer = new itowns.PlanarLayer(layerInfo.title,  {source : layerSource});
+                    break;
+            }
+            view.addLayer(layer);
+            addedLayers[layerInfo.title] = layer;
+
+            // Create GUI controls for the layer
+            const layerFolder = layersGui.addFolder(layerInfo.title);
+            layerFolder.add(layer, 'visible').name("Visible").onChange(() => view.notifyChange());
+            layerFolder.add(layer, 'opacity', 0, 1).name("Opacity").onChange(() => view.notifyChange());
+            layerFolder.add({ remove: () => removeLayer(layerInfo.title, layerFolder) }, 'remove').name("Remove Layer");
+
+            view.notifyChange();
+    }
+
+    function removeLayer(layerName, layerFolder) {
+        const layer = addedLayers[layerName];
+        if (layer) {
+            view.removeLayer(layer.id);
+            layerFolder.close();  // Close folder before removing
+            layersGui.removeFolder(layerFolder);  // Remove from GUI
+            delete addedLayers[layerName];
+            view.notifyChange();
+        }
+    }
+
+    // Initialize viewer and layer selector
+
+    //WMTS :
+    //initLayerSelector("https://data.geopf.fr/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetCapabilities");
+    //WMS :
+    initLayerSelector("https://data.geopf.fr/annexes/ressources/wms-r/ortho.xml");
+    //initLayerSelector("https://apps.sogelink.fr/maplink/secured/geography/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities");
+    //initLayerSelector("https://mapsref.brgm.fr/wxs/georisques/risques?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities")
+    //initLayerSelector("https://mapsref.brgm.fr/wxs/infoterre/catalogue?VERSION=1.1.1&SERVICE=WMS&REQUEST=GetCapabilities")
+    //WFS :
+    //initLayerSelector("https://data.geopf.fr/wfs/ows?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetCapabilities");
+
+    // Add picking tool
+    viewerDiv.addEventListener('mousemove', (evt) => onMouseMove(evt), true);
+
+    function onMouseMove(event) {
+        let htmlInfo = document.getElementById('infoBuilding');
+        htmlInfo.innerHTML = ' ';
+
+        if (event.buttons === 1 || event.buttons === 2) {
+            return;
+        }
+
+        view.camera.camera3D.updateMatrixWorld();
+        let intersects = view.pickObjectsAt(event, 5, Object.keys(addedLayers));
+        let properties;
+        let info;
+        let batchId;
+
+        if (intersects.length > 0) {
+            /*
+            batchId = intersects[0].object.geometry.attributes.batchId.array[intersects[0].face.a];
+            properties = intersects[0].object.feature.geometries[batchId].properties;
+            Object.keys(properties).map(function (objectKey) {
+                let value = properties[objectKey];
+                if (value) {
+                    let key = objectKey.toString();
+                    if (key[0] !== '_' && key !== 'geometry_name') {
+                        info = value.toString();
+                        htmlInfo.innerHTML +='<li><b>' + key + ': </b>' + info + '</li>';
+                    }
+                }
+            });
+            */
+        }
+    }
+
+</script>
+</body>
+</html>
