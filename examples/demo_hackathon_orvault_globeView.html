@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Demo GlobeView</title>
+
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div id="description">
+            <p><b>Point Cloud information</b></p>
+            <ul id="info"></ul>
+            <p><b>WFS information</b></p>
+            <ul id="infoBuilding"></ul>
+        </div>
+        <div id="viewerDiv"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+        <script src="../dist/itowns.js"></script>
+        <script src="js/GUI/CustomLoadingScreen.js"></script>
+        <script src="../dist/debug.js"></script>
+        <script src="js/GUI/GuiTools.js"></script>
+        <script src="https://unpkg.com/camera-controls@2.7.2/dist/camera-controls.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+        <script src="js/plugins/COGParser.js"></script>
+        <script src="js/plugins/COGSource.js"></script>
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+                }
+            }
+        </script>
+
+        <script type="module">
+            const THREE = itowns.THREE;
+            import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+            var potreeLayer;
+            var viewerDiv;
+            var debugGui;
+            var view;
+            var controls;
+            var clock = new THREE.Clock();
+            var scene = new THREE.Scene();
+            var color = new THREE.Color();
+            var debugMenu;
+            var pivot;
+            var raycaster = new THREE.Raycaster();
+            var ifcModel;
+            var dwgModel;
+
+            CameraControls.install( { THREE: THREE } );
+
+            viewerDiv = document.getElementById('viewerDiv');
+            viewerDiv.style.display = 'block';
+
+            debugGui = new dat.GUI();
+
+            const IMAGE_SOURCE_TYPE = {
+                SATELLITE: 0,
+                IGN_PLANV2: 1,
+                OMNISCALE_OPEN_STREET_MAP: 2
+            };
+
+            const settings = {
+                imageSourceType: IMAGE_SOURCE_TYPE.SATELLITE,
+                omniscaleKey: "",
+                opacity: 1,
+                dwgVisibility: true,
+                showWFSProperties: true
+            }
+
+            // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
+            itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+            itowns.proj4.defs('EPSG:4978', '+proj=geocent +datum=WGS84 +ellps=GRS80 +units=m +vunits=m +no_defs +type=crs');
+            itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+
+            var customRenderer = createRenderer();
+            var rendererSize = customRenderer.getSize(new THREE.Vector2());
+            var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 0.1, 1000);
+            scene.add(customCamera);
+
+            let layerOrtho;
+            let layerDEM;
+            let layerGeoJson;
+            let layerGeoTiff;
+
+            var gltfLoader = new itowns.iGLTFLoader();
+            var dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath('./libs/draco/');
+            gltfLoader.setDRACOLoader(dracoLoader);
+
+            var placement = {
+                coord: new itowns.Coordinates('EPSG:3947', 1351190.537, 6240402.554, 52.429),
+                range: 100,
+                tilt: 0,
+                heading: 0
+            }
+
+            createLights();
+            loadView();
+
+            function animate() {
+                const delta = clock.getDelta();
+                const updated = controls.update( delta );
+                if (updated) {
+                    view.notifyChange(customCamera);
+                }
+                requestAnimationFrame( animate );
+            }
+
+            function createLights() {
+                const directionalLight1 = new THREE.DirectionalLight(0xffeeff, 0.8);
+                directionalLight1.position.set(1, 1, 1);
+                scene.add(directionalLight1);
+
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight2.position.set(-1, 0.5, -1);
+                scene.add(directionalLight2);
+
+                const ambientLight = new THREE.AmbientLight(0xffffee, 0.25);
+                scene.add(ambientLight);
+            }
+
+            function createRenderer() {
+                const renderer = new THREE.WebGLRenderer({
+                    alpha: true,
+                    antialias: true,
+                    powerPreference: "high-performance",
+                    preserveDrawingBuffer: true
+                });
+                renderer.setSize(viewerDiv.clientWidth, viewerDiv.clientHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                renderer.info.autoReset = false;
+
+                // Improve color rendering
+                renderer.localClippingEnabled = true;
+                renderer.setClearColor(0x000000, 0);
+
+                // Increase start-up time to render
+                const pmremGenerator = new THREE.PMREMGenerator(renderer);
+                pmremGenerator.compileEquirectangularShader();
+
+                viewerDiv.appendChild(renderer.domElement);
+
+                return renderer;
+            }
+
+            function loadView() {
+                view = new itowns.GlobeView(viewerDiv,
+                    placement,
+                    {
+                        camera: { cameraThree: customCamera },
+                        renderer: customRenderer,
+                        scene3D: scene,
+                        noControls: true
+                    });
+
+                view.tileLayer.disableSkirt = true;
+                view.tileLayer.opacity = settings.opacity;
+
+                customRenderer.setClearColor(0x000000, 0);
+                setupLoadingScreen(viewerDiv, view);
+                window.view = view;
+                debugMenu = new GuiTools('menuDiv', view);
+
+                Promise.all([
+                    loadIfc(),
+                    loadElevation(),
+                    loadOrtho(),
+                    loadPointCloud(),
+                    loadGeoJson(),
+                    loadGeoTiff(),
+                    // load3DTilesBuildings(),
+                    loadBuildings(),
+                    loadDWG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/DWG_GLB/bloc.glb", 1351130.3349769686, 6240354.932333742, 53.218872),
+                    loadCadastreWFS()
+                ])
+                    .then(onAllLoaded);
+            }
+
+            function loadIfc() {
+                return new Promise((resolve) => {
+                    gltfLoader.load('https://blocinbloc-public-test.s3.fr-par.scw.cloud/batiment-orvault-cc47.glb',
+                        (glb) => {
+                            const model = glb.scene;
+                            model.name = 'model';
+
+                            const coord = new itowns.Coordinates(
+                                'EPSG:3947', 1351152.118201931, 6240395.0059363097, 61.33
+                            );
+
+                            positionObjectOnGlobe(coord, model);
+
+                            scene.add(model);
+                            ifcModel = model;
+                            view.notifyChange();
+
+                            resolve();
+                        });
+                });
+            }
+
+            function loadElevation() {
+                return itowns.Fetcher.json('./layers/JSONLayers/IGN_MNT_HIGHRES.json').then(function _(config) {
+                    config.source = new itowns.WMTSSource(config.source);
+                    var elevationLayer = new itowns.ElevationLayer(config.id, config);
+                    return view.addLayer(elevationLayer);
+                });
+            }
+
+            function loadOrtho() {
+                return itowns.Fetcher.json('./layers/JSONLayers/Ortho.json').then(function _(config) {
+                    config.source = new itowns.WMTSSource(config.source);
+                    var colorLayer = new itowns.ColorLayer(config.id, config);
+                    return view.addLayer(colorLayer).then(() => {
+                        itowns.ColorLayersOrdering.moveLayerToIndex(view, config.id, 0);
+                    });
+                });
+            }
+
+            function loadPointCloud() {
+                // Configure Point Cloud layer
+                potreeLayer = new itowns.Potree2Layer('Points cloud', {
+                    source: new itowns.Potree2Source({
+                        file: 'metadata.json',
+                        url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/Orvault-Potree2-brotli-4978'
+                    }),
+                });
+
+                return itowns.View.prototype.addLayer.call(view, potreeLayer);
+            }
+
+            function loadGeoJson() {
+                // Handle fetching step.
+                // Should you implement a custom fetcher, it would need to be called here.
+                return itowns.Fetcher.json('https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/orvault.geojson')
+                    .then((fetched) => {
+                        // Handle parsing step.
+                        // We parse the fetched data into a FeatureCollection.
+                        // See http://www.itowns-project.org/itowns/docs/#api/Base/FeatureCollection.
+                        // Should you implement a custom parser, it would need to be called here.
+                        return itowns.GeoJsonParser.parse(fetched, {
+                            // Information on the fetched data.
+                            // See http://www.itowns-project.org/itowns/docs/#api/Source/ParsingOptions.
+                            in: {
+                                crs: 'EPSG:4326',
+                            },
+                            // Information on the FeatureCollection that should be created from the fetched data. Here, we pass a
+                            // FeatureBuildingOptions (http://www.itowns-project.org/itowns/docs/#api/Base/FeatureBuildingOptions).
+                            out: {
+                                crs: view.tileLayer.extent.crs,
+                            },
+                    });
+                }).then((parsed) => {
+                    // Finally, define a FileSource from the parsed data
+                    const sourceFromParsedData = new itowns.FileSource({ features: parsed });
+                    layerGeoJson = new itowns.ColorLayer('GeoJson', {
+                        source: sourceFromParsedData,
+                        style: {
+                            stroke: {
+                                color: 'red',
+                                width: 2
+                            },
+                        },
+                    });
+                    return view.addLayer(layerGeoJson);
+                });
+            }
+
+            function loadGeoTiff() {
+                const sourceTiff = new COGSource({
+                    url: "https://blocinbloc-public-test.s3.fr-par.scw.cloud/Enedis4.tif",
+                    name: "Enedis",
+                    crs: 'EPSG:4326',
+                });
+
+                layerGeoTiff = new itowns.ColorLayer('GeoTiff', {
+                    source: sourceTiff
+                });
+
+                return view.addLayer(layerGeoTiff).then(() => {
+                    itowns.ColorLayersOrdering.moveLayerUp(view, 'GeoTiff');
+                });
+            }
+
+            const orange = new THREE.Color(0xffa400);
+            const blue = new THREE.Color(0x47edff);
+            const black = new THREE.Color(0x000000);
+            const red = new THREE.Color(0xff0000);
+
+            function colorBuildings(properties, ctx) {
+                if (properties.usage_1 === 'Résidentiel') {
+                    color.set(0xFDFDFF);
+                } else if (properties.usage_1 === 'Annexe') {
+                    color.set(0xC6C5B9);
+                } else if (properties.usage_1 === 'Commercial et services') {
+                    color.set(0x62929E);
+                } else if (properties.usage_1 === 'Religieux') {
+                    color.set(0x393D3F);
+                } else if (properties.usage_1 === 'Sportif') {
+                    color.set(0x546A7B);
+                } else {
+                    color.set(0x555555);
+                }
+
+                /*
+                const distance = ctx.coordinates.planarDistanceTo(buildingCoord);
+                if (distance < 300) {
+                    return blue;
+                } else if (distance < 350){
+                    return black;
+                } else if (distance < 1000){
+                    return color;
+                } else if (distance < 1050){
+                    return red;
+                }
+                return color.lerp(orange, Math.min(distance / 4000, 1.0));
+                */
+                return color;
+            }
+
+
+            function extrudeBuildings(properties) {
+                return properties.hauteur;
+            }
+
+            function altitudeBuildings(properties) {
+                return properties.altitude_minimale_sol;
+            }
+
+            function acceptFeature(properties) {
+                return !!properties.hauteur;
+            }
+
+            function load3DTilesBuildings() {
+                const source = new itowns.OGC3DTilesSource({
+                    url: "https://storage.googleapis.com/ahp-research/projects/sogelink/hackathon/bdnb/sampleset/tileset.json"
+                });
+                const layer = new itowns.OGC3DTilesLayer('3DTiles', {
+                    source,
+                });
+                return view.addLayer(layer).then((layer) => {
+                    debug.createOGC3DTilesDebugUI(debugMenu.gui, view, layer);
+                });
+            }
+
+            function loadBuildings() {
+                const buildingsGroup = new THREE.Group();
+                buildingsGroup.name = "Building groups";
+                view.tileLayer.object3d.add(buildingsGroup);
+
+                var wfsBuildingSource = new itowns.WFSSource({
+                    url: 'https://data.geopf.fr/wfs/ows?',
+                    version: '2.0.0',
+                    typeName: 'BDTOPO_V3:batiment',
+                    crs: 'EPSG:4326',
+                    ipr: 'IGN',
+                    format: 'application/json'
+                });
+
+                var wfsBuildingLayer = new itowns.FeatureGeometryLayer('wfsBuilding', {
+                    batchId: function (property, featureId) { return featureId; },
+                    filter: acceptFeature,
+                    crs: 'EPSG:3947',
+                    source: wfsBuildingSource,
+                    object3d: buildingsGroup,
+                    style: {
+                        fill: {
+                            color: colorBuildings,
+                            base_altitude: altitudeBuildings,
+                            extrusion_height: extrudeBuildings,
+                        }
+                    },
+                    zoom: { min: 14 },
+                });
+
+                return view.addLayer(wfsBuildingLayer).then((layer) => {
+                    const gui = debug.GeometryDebug.createGeometryDebugUI(
+                        debugMenu.gui,
+                        view,
+                        layer
+                    );
+                    debug.GeometryDebug.addWireFrameCheckbox(gui, view, layer);
+                });
+            }
+
+            function loadDWG(url, centerX, centerY, centerZ) {
+                return new Promise((resolve) => {
+                    gltfLoader.load(url,
+                        (glb) => {
+                            const model = glb.scene;
+                            model.name = 'dwg';
+                            dwgModel = model;
+
+                            // building coordinate
+                            const coord = new itowns.Coordinates(
+                                'EPSG:3947', centerX, centerY, centerZ
+                            );
+
+                            positionObjectOnGlobe(coord, model);
+
+                            scene.add(model);
+                            view.notifyChange();
+
+                            resolve();
+                        });
+                });
+            }
+
+            function loadCadastreWFS() {
+                var wfsBuildingSource = new itowns.WFSSource({
+                    url: 'https://data.geopf.fr/wfs/ows?',
+                    version: '2.0.0',
+                    typeName: 'CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle',
+                    crs: 'EPSG:4326',
+                    ipr: 'IGN',
+                    format: 'application/json',
+                });
+
+                var wfsBuildingLayer = new itowns.ColorLayer('wfsCadastre', {
+                    transparent: true,
+                    style: {
+                        fill: {
+                            opacity: 0.5,
+                            color: "#FF7F00"
+                        },
+                    },
+                    source: wfsBuildingSource,
+                    zoom: { max: 20, min: 13 },
+                });
+                view.addLayer(wfsBuildingLayer);
+            }
+
+            function setOrbitPoint(raycastObj) {
+                const point = raycastObj.point;
+                if (pivot === undefined) {
+                    const geometry = new THREE.SphereGeometry( 1, 32, 16 );
+                    const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+                    const sphere = new THREE.Mesh( geometry, material );
+                    pivot = sphere;
+                    scene.add(pivot);
+                }
+                pivot.position.set(point.x, point.y, point.z);
+                controls.setOrbitPoint(point.x, point.y, point.z);
+            }
+
+            function onMouseDown(event) {
+                customCamera.updateMatrixWorld();
+                raycaster.setFromCamera(view.eventToNormalizedCoords(event), customCamera);
+
+                const raycastResults = ifcModel !== undefined ? raycaster.intersectObjects(ifcModel.children, true) : [];
+                let viewRaycastResults = view.pickObjectsAt(event, 5);
+
+                const cameraPos = view.camera3D.getWorldPosition(new THREE.Vector3());
+                const cameraPosCoord = new itowns.Coordinates(view.referenceCrs);
+                cameraPosCoord.setFromVector3(cameraPos);
+                const coord = view.pickTerrainCoordinates(event);
+
+                viewRaycastResults = viewRaycastResults.map((r) => {
+                    if (r.layer.isTiledGeometryLayer) {
+                        // Get position from coord
+                        r.point = new THREE.Vector3();
+                        coord.toVector3(r.point);
+                        // Compute distance between point and camera
+                        r.distance = r.point.distanceTo(cameraPos);
+                    }
+                    return r;
+                });
+                viewRaycastResults.sort((r1, r2) => r1.distance > r2.distance);
+
+                if (viewRaycastResults.length > 0) {
+                    // Find index element to insert
+                    let index = 0;
+                    const elementToInsert = viewRaycastResults[0];
+                    while ((index < raycastResults.length) && (elementToInsert.distance > raycastResults[index].distance)) {
+                        index++;
+                    }
+                    raycastResults.splice(index, 0, elementToInsert);
+                }
+
+                if (raycastResults.length > 0) {
+                    setOrbitPoint(raycastResults[0]);
+                }
+            }
+
+            function onAllLoaded() {
+                controls = new CameraControls(customCamera, viewerDiv);
+                const boundingSphere = potreeLayer.root.bbox.getBoundingSphere(new THREE.Sphere());
+                controls.fitToSphere(boundingSphere, false);
+                controls.rotate( 0, 90 * THREE.MathUtils.DEG2RAD, false );
+                animate();
+                controls.applyCameraUp();
+
+                // Add picking tool
+                viewerDiv.addEventListener('mousemove', (evt) => onMouseMove(evt), true);
+
+                // Used to set the orbitPoint
+                viewerDiv.addEventListener("mousedown", (evt) => onMouseDown(evt), true);
+
+                if (potreeLayer != null) {
+                    debug.PointCloudDebug.initTools(view, potreeLayer, debugMenu.gui);
+                }
+
+                var imageryLayers = [];
+                if (layerOrtho !== undefined) {
+                    imageryLayers.push(layerOrtho);
+                }
+                if (layerGeoJson !== undefined) {
+                    imageryLayers.push(layerGeoJson);
+                }
+                if (layerGeoTiff !== undefined) {
+                    imageryLayers.push(layerGeoTiff);
+                }
+
+                debugMenu.addImageryLayersGUI(imageryLayers);
+                if (layerDEM !== undefined) {
+                    debugMenu.addElevationLayerGUI(layerDEM);
+                }
+
+                debugMenu.resize = function() {
+                    console.log("Resize extent");
+                    view.dispose();
+                    extentSize = extentSize * 2;
+                    loadView();
+                };
+
+                debugMenu.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
+                debugMenu.gui.add(settings, 'omniscaleKey').name('Omniscale key').onChange(changeSourceImage);
+                debugMenu.gui.add(debugMenu, 'resize').name('Resize view extent');
+                debugMenu.gui.add(settings, 'opacity', 0.0, 1.0, 0.01).name('Global opacity').onChange(updateOpacity);
+                debugMenu.gui.add(settings, 'dwgVisibility').name('DWG visibility').onChange(updateDWGVisibility);
+                debugMenu.gui.add(settings, 'showWFSProperties').name('Show properties');
+
+                if (potreeLayer != null) {
+                    // update stats window
+                    var info = document.getElementById('info');
+                    view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_RENDER, () => {
+                        info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
+                    });
+                }
+
+                animate();
+                hideLoader();
+            }
+
+            function changeSourceImage() {
+                settings.imageSourceType = parseInt(settings.imageSourceType);
+                view.removeLayer('Fond de carte');
+                loadOrtho();
+            }
+
+            function updateOpacity() {
+                view.tileLayer.opacity = settings.opacity;
+                view.notifyChange();
+            }
+
+            function updateDWGVisibility() {
+                dwgModel.visible = settings.dwgVisibility;
+                view.notifyChange();
+            }
+
+            function positionObjectOnGlobe(coord, object) {
+                const tmpCoord = coord.as(view.referenceCrs);
+                tmpCoord.toVector3(object.position);
+                object.lookAt(tmpCoord.geodesicNormal.clone().add(object.position));
+                object.rotateX(90 * THREE.MathUtils.DEG2RAD);
+                object.updateMatrixWorld(true);
+            }
+
+            function onMouseMove(event) {
+                var htmlInfo = document.getElementById('infoBuilding');
+                htmlInfo.innerHTML = ' ';
+
+                if (!settings.showWFSProperties || event.buttons === 1 || event.buttons === 2) {
+                    return;
+                }
+                customCamera.updateMatrixWorld();
+
+                var intersects = view.pickObjectsAt(event, 5, ['wfsBuilding']);
+                var properties;
+                var info;
+                var batchId;
+
+                if (intersects.length) {
+                    batchId = intersects[0].object.geometry.attributes.batchId.array[intersects[0].face.a];
+                    properties = intersects[0].object.feature.geometries[batchId].properties;
+                    Object.keys(properties).map(function (objectKey) {
+                        var value = properties[objectKey];
+                        if (value) {
+                            var key = objectKey.toString();
+                            if (key[0] !== '_' && key !== 'geometry_name') {
+                                info = value.toString();
+                                htmlInfo.innerHTML +='<li><b>' + key + ': </b>' + info + '</li>';
+                            }
+                        }
+                    });
+                }
+
+                intersects = view.pickFeaturesAt(event, 2, 'wfsCadastre');
+
+                if (intersects.wfsCadastre.length) {
+                    properties = intersects.wfsCadastre[0].geometry.properties;
+                    Object.keys(properties).map(function (objectKey) {
+                        var value = properties[objectKey];
+                        if (value) {
+                            var key = objectKey.toString();
+                            if (key[0] !== '_' && key !== 'geometry_name') {
+                                info = value.toString();
+                                htmlInfo.innerHTML +='<li><b>' + key + ': </b>' + info + '</li>';
+                            }
+                        }
+                    });
+                }
+            }
+        </script>
+    </body>
+</html>
+

@@ -129,3 +129,86 @@ The governance of the project is open and explicited [here](https://github.com/i
 
 [![IGN](./img/logo_ign.png)](https://www.ign.fr)
 [![CIRIL Group](./img/CIRIL_Group_logo.png)](https://www.cirilgroup.com/en/)
+
+
+# Troubleshooting
+
+## Multipage TIFF
+
+### Manual processing
+
+Multipage tiff can be created using Subdatasets and look like this :
+```
+Subdatasets:
+  SUBDATASET_1_NAME=GTIFF_DIR:1:example.tif
+  SUBDATASET_1_DESC=Page 1 (2289P x 1461L x 4B)
+  SUBDATASET_2_NAME=GTIFF_DIR:2:example.tif
+  SUBDATASET_2_DESC=Page 2 (2289P x 1461L x 4B)
+  SUBDATASET_3_NAME=GTIFF_DIR:3:example.tif
+  SUBDATASET_3_DESC=Page 3 (2289P x 1461L x 4B)
+  SUBDATASET_4_NAME=GTIFF_DIR:4:example.tif
+  SUBDATASET_4_DESC=Page 4 (2289P x 1461L x 4B)
+  SUBDATASET_5_NAME=GTIFF_DIR:5:example.tif
+  SUBDATASET_5_DESC=Page 5 (2289P x 1461L x 4B)
+  SUBDATASET_6_NAME=GTIFF_DIR:6:example.tif
+  SUBDATASET_6_DESC=Page 6 (2289P x 1461L x 4B)
+  SUBDATASET_7_NAME=GTIFF_DIR:7:example.tif
+  SUBDATASET_7_DESC=Page 7 (2289P x 1461L x 4B)
+```
+
+To merge into one file you have to get Gdal and Gdal python :
+
+```
+pip install --no-cache-dir --force-reinstall 'GDAL[numpy]==3.11'
+```
+
+and then use gdaltranslate to create file for each subdatasets : 
+
+```
+gdal_translate -sds input.tif tmp_outs.tif
+```
+
+then create a list of file to merge for the next commands using (you have to have only output tiff files in the folder)
+
+```
+ls -1 *.tif > tiff_list.txt 
+```
+
+then using gdal_merge
+
+```
+gdal_merge.py -o mosaic.tif --optfile tiff_list.txt
+```
+
+and you get a geotiff with only one page.
+
+Now you can create COG with :
+
+```
+gdal_translate input.tif output_cog.tif -of COG -co COMPRESS=LZW
+```
+
+Tested pipelines that does not work : 
+gdalbuildvrt / geotiff bands
+
+### With Docker : osgeo/gdal
+
+Step by Step :
+
+```
+docker run --entrypoint /bin/bash --rm -it -v $(pwd):/COG osgeo/gdal -c "gdal_translate -sds COG/dicttodao.tif COG/tmp/tmp_outs.tif"
+docker run --entrypoint /bin/bash --rm -it -v $(pwd):/COG osgeo/gdal -c "ls -1 COG/tmp/*.tif > COG/tmp/tiff_list.txt"
+docker run --entrypoint /bin/bash --rm -it -v $(pwd):/COG osgeo/gdal -c "gdal_merge.py -o COG/merged.tif --optfile COG/tmp/tiff_list.txt"
+docker run --entrypoint /bin/bash --rm -it -v $(pwd):/COG osgeo/gdal -c "gdal_translate COG/merged.tif COG/cog.tif -of COG -co COMPRESS=LZW"
+```
+
+One-liner :
+
+```
+docker run --entrypoint /bin/bash --rm -it -v $(pwd):/COG osgeo/gdal -c "
+    gdal_translate -sds COG/dicttodao.tif COG/tmp/tmp_outs.tif &&
+    ls -1 COG/tmp/*.tif > COG/tmp/tiff_list.txt &&
+    gdal_merge.py -o COG/merged.tif --optfile COG/tmp/tiff_list.txt &&
+    gdal_translate COG/merged.tif COG/cog.tif -of COG -co COMPRESS=LZW"
+```
+
