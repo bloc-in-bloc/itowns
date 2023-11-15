@@ -210,6 +210,39 @@
                 requestAnimationFrame( animate );
             }
 
+            // Handle fetching step.
+            // Should you implement a custom fetcher, it would need to be called here.
+            itowns.Fetcher.json(
+                'https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/orvault.geojson',
+            ).then((fetched) => {
+                // Handle parsing step.
+                // We parse the fetched data into a FeatureCollection.
+                // See http://www.itowns-project.org/itowns/docs/#api/Base/FeatureCollection.
+                // Should you implement a custom parser, it would need to be called here.
+                return itowns.GeoJsonParser.parse(fetched, {
+                    // Information on the fetched data.
+                    // See http://www.itowns-project.org/itowns/docs/#api/Source/ParsingOptions.
+                    in: {
+                        crs: 'EPSG:4326',
+                    },
+                    // Information on the FeatureCollection that should be created from the fetched data. Here, we pass a
+                    // FeatureBuildingOptions (http://www.itowns-project.org/itowns/docs/#api/Base/FeatureBuildingOptions).
+                    out: {
+                        crs: view.tileLayer.extent.crs,
+                    },
+                });
+            }).then((parsed) => {
+                // Finally, define a FileSource from the parsed data
+                const sourceFromParsedData = new itowns.FileSource({ features: parsed });
+
+                view.addLayer(new itowns.ColorLayer('Orvault', {
+                    source: sourceFromParsedData,
+                    style: {
+                        stroke: { color: 'red', width: 2 },
+                    },
+                }));
+            });
+
             itowns.View.prototype.addLayer.call(view, potreeLayer).then(onLayerReady);
         </script>
     </body>
