@@ -121,12 +121,16 @@
             let layerOrtho;
             let layerDEM;
             let layerGeoJson;
+            let layerGeoTiff;
 
-            loadIfc()
-                .then(loadElevation)
-                .then(loadOrtho)
-                .then(loadPointCloud)
-                .then(loadGeoJson)
+            Promise.all([
+                    loadIfc(),
+                    loadElevation(),
+                    loadOrtho(),
+                    loadPointCloud(),
+                    loadGeoJson(),
+                    loadGeoTiff()
+                ])
                 .then(onAllLoaded);
 
             function animate() {
@@ -249,11 +253,30 @@
                 });
             }
 
+            function loadGeoTiff() {
+                const sourceTiff = new itowns.WMSSource({
+                    url: "https://60f9-2001-861-3a06-3650-19b3-859a-b017-49a6.ngrok-free.app/geoserver/cite/ows?service=WMS&version=1.3.0&request=GetLegendGraphic&format=image%2Fpng&width=20&height=20&layer=Enedis",
+                    name: "Enedis",
+                    format: "image/png",
+                    crs: 'EPSG:3947',
+                    extent: viewExtent,
+                });
+
+                layerGeoTiff = new itowns.ColorLayer('GeoTiff', {
+                    source: sourceTiff,
+                    effect_type : 2
+                });
+
+                return view.addLayer(layerGeoTiff).then(() => {
+                    itowns.ColorLayersOrdering.moveLayerUp(view, 'GeoTiff');
+                });
+            }
+
             function onAllLoaded() {
                 debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
 
                 const menuGlobe = new GuiTools('menuDiv', view);
-                menuGlobe.addImageryLayersGUI([layerOrtho, layerGeoJson]);
+                menuGlobe.addImageryLayersGUI([layerOrtho, layerGeoJson, layerGeoTiff]);
                 menuGlobe.addElevationLayerGUI(layerDEM);
 
                 const boundingSphere = potreeLayer.root.bbox.getBoundingSphere(new THREE.Sphere());
