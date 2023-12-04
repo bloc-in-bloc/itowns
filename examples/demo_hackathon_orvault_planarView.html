@@ -262,9 +262,25 @@
                     extent: viewExtent,
                 });
 
+                itowns.ShaderChunk.customHeaderColorLayer(`
+                 // define yours methods
+                 float tolerance2 = 0.99;
+                 vec4 applyWhiteToInvisibleEffect(vec4 color) {
+                    float a = dot(color.rgb, vec3(0.333333333));
+                    if (a >= tolerance2) {
+                        color.a = 0.0;
+                    }
+                    return color;
+                 }
+                `);
+
+                itowns.ShaderChunk.customBodyColorLayer(`
+                 color = applyWhiteToInvisibleEffect(color);
+                `);
+
                 layerGeoTiff = new itowns.ColorLayer('GeoTiff', {
                     source: sourceTiff,
-                    effect_type : 2
+                    effect_type : 3
                 });
 
                 return view.addLayer(layerGeoTiff).then(() => {
@@ -273,20 +289,25 @@
             }
 
             function onAllLoaded() {
-                debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
+                if (potreeLayer != null) {
+                    debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
+                }
 
                 const menuGlobe = new GuiTools('menuDiv', view);
                 menuGlobe.addImageryLayersGUI([layerOrtho, layerGeoJson, layerGeoTiff]);
                 menuGlobe.addElevationLayerGUI(layerDEM);
 
-                const boundingSphere = potreeLayer.root.bbox.getBoundingSphere(new THREE.Sphere());
+                const boundingSphere = new THREE.Box3().setFromObject(scene).getBoundingSphere(new THREE.Sphere());
+                boundingSphere.center.z = boundingSphere.center.z - 100;
                 controls.fitToSphere(boundingSphere, false);
 
-                // update stats window
-                var info = document.getElementById('info');
-                view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_RENDER, () => {
-                    info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
-                });
+                if (potreeLayer != null) {
+                    // update stats window
+                    var info = document.getElementById('info');
+                    view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_RENDER, () => {
+                        info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
+                    });
+                }
 
                 animate();
             }
