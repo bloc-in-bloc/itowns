@@ -95,6 +95,12 @@ GuiTools.prototype.addImageryLayerGUI = function addImageryLayerGUI(layer) {
         layer.frozen = value;
         this.view.notifyChange(layer);
     }).bind(this));
+    if (layer.effect_type != undefined) {
+        folder.add({ effect_type: layer.effect_type }, 'effect_type').onChange((function updateEffectType(value) {
+            layer.effect_type = value;
+            this.view.notifyChange(layer);
+        }).bind(this));
+    }
 };
 
 GuiTools.prototype.addElevationLayerGUI = function addElevationLayerGUI(layer) {
