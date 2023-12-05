@@ -154,11 +154,6 @@
                             const coord = new itowns.Coordinates('EPSG:3947', 1351152.118201931, 6240395.0059363097, 61.329999999999998);
 
                             model.position.copy(coord.as(view.referenceCrs));
-                            console.log(coord.as(view.referenceCrs));
-                            console.log(model.position);
-
-                            const bbox = new THREE.Box3().setFromObject(model);
-                            controls.fitToBox(bbox, false);
                             model.rotateX(90 * THREE.MathUtils.DEG2RAD);
 
                             // update coordinate of the mesh
@@ -298,8 +293,9 @@
                 menuGlobe.addElevationLayerGUI(layerDEM);
 
                 const boundingSphere = new THREE.Box3().setFromObject(scene).getBoundingSphere(new THREE.Sphere());
-                boundingSphere.center.z = boundingSphere.center.z - 100;
+                boundingSphere.radius = boundingSphere.radius / 8;
                 controls.fitToSphere(boundingSphere, false);
+                controls.rotate(180 * THREE.MathUtils.DEG2RAD, -45 * THREE.MathUtils.DEG2RAD, false);
 
                 if (potreeLayer != null) {
                     // update stats window
