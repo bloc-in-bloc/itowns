@@ -67,7 +67,7 @@
             // Define the view geographic extent
             itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
 
-            const alpha = 500;
+            const alpha = 200;
             const viewExtent = new itowns.Extent(
                 'EPSG:3947',
                 1351190.5369999579 - alpha, 1351190.5369999579 + alpha,
@@ -283,6 +283,34 @@
                 });
             }
 
+            function onMouseDown(event) {
+                let result = view.pickObjectsAt(event, 5);
+
+                const cameraPos = view.camera3D.getWorldPosition(new THREE.Vector3());
+                const cameraPosCoord = new itowns.Coordinates(view.referenceCrs);
+                cameraPosCoord.setFromVector3(cameraPos);
+
+                result = result.map((r) => {
+                    if (r.layer.isTiledGeometryLayer) {
+                        const coord = view.pickTerrainCoordinates(event);
+                        const distance = coord.spatialEuclideanDistanceTo(cameraPosCoord);
+                        r.distance = distance;
+
+                        var direction = new THREE.Vector3();
+                        direction.subVectors(coord.toVector3(), cameraPosCoord).normalize();
+                        var point = cameraPos.clone().add(direction.multiplyScalar(distance));
+                        r.point = point;
+                    }
+                    return r;
+                });
+                result.sort((r1, r2) => r1.distance > r2.distance);
+
+                if (result.length > 0) {
+                    const point = result[0].point;
+                    controls.setOrbitPoint(point.x, point.y, point.z);
+                }
+            }
+
             function onAllLoaded() {
                 if (potreeLayer != null) {
                     debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
@@ -304,6 +332,9 @@
                         info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
                     });
                 }
+
+                // Used to set the orbitPoint
+                viewerDiv.addEventListener("mousedown", (evt) => onMouseDown(evt), true);
 
                 animate();
             }
