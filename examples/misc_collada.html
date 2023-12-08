@@ -41,7 +41,7 @@
 
             // Define camera initial position
             const placement = {
-                coord: new itowns.Coordinates('EPSG:4326', 4.21655, 44.84415),
+                coord: new itowns.Coordinates('EPSG:4326', -1.613091, 47.270959, 61.329999999999998),
                 range: 500,
                 heading: 180,
                 tilt: 60,
@@ -93,24 +93,19 @@
             loader.load(url, function (collada) {
                 const model = collada.scene;
 
-                // building coordinate
-                const coord = new itowns.Coordinates(
-                    'EPSG:4326', 4.2165, 44.844, 1417,
-                );
+                    // building coordinate
+                    const coord = new itowns.Coordinates(
+                        'EPSG:4326', -1.613091, 47.270959, 61.329999999999998,
+                    );
 
-                model.position.copy(coord.as(view.referenceCrs));
-                // align up vector with geodesic normal
-                model.lookAt(model.position.clone().add(coord.geodesicNormal));
-                // user rotate building to align with ortho image
-                model.rotateZ(-Math.PI * 0.2);
-                model.scale.set(1.2, 1.2, 1.2);
+                    model.position.copy(coord.as(view.referenceCrs));
+                    // align up vector with geodesic normal
+                    model.lookAt(model.position.clone().add(coord.geodesicNormal));
+                    // user rotate building to align with ortho image
+                    model.rotateX(90 * itowns.THREE.MathUtils.DEG2RAD);
 
-                // update coordinate of the mesh
-                model.updateMatrixWorld();
-
-                view.scene.add(model);
-                view.notifyChange();
-            });
+                    // update coordinate of the mesh
+                    model.updateMatrixWorld();
 
 
             // Warning: the following code is not part of this example, those
