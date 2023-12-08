@@ -249,7 +249,11 @@
 
                 // Create the ortho-images ColorLayer and add it to the view
                 layerOrtho = new itowns.ColorLayer('Fond de carte', { source: sourceMap });
-                return view.addLayer(layerOrtho);
+                return view.addLayer(layerOrtho).then(()=>{
+                    if (layerGeoTiff != undefined) {
+                        itowns.ColorLayersOrdering.moveLayerUp(view, 'GeoTiff');
+                    }
+                });
             }
 
             function loadPointCloud() {
