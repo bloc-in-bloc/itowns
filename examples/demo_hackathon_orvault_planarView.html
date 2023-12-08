@@ -60,18 +60,41 @@
 
             debugGui = new dat.GUI();
 
+            const IMAGE_SOURCE_TYPE = {
+                SATELLITE: 0,
+                IGN_PLANV2: 1,
+                OMNISCALE_OPEN_STREET_MAP: 2
+            };
+
+            const settings = {
+                imageSourceType: IMAGE_SOURCE_TYPE.SATELLITE,
+                omniscaleKey: ""
+            }
+
             // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
             itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
             itowns.proj4.defs('EPSG:4978', '+proj=geocent +datum=WGS84 +ellps=GRS80 +units=m +vunits=m +no_defs +type=crs');
             itowns.proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
-            // Define the view geographic extent
             itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
 
-            const alpha = 200;
+            const viewExtentEPSG = "EPSG:3947";
+            const orthoEPSG = viewExtentEPSG; // "EPSG:3947";
+
+            const objectEPSG = "EPSG:3947";
+            const objectPos = [1351152.118201931, 6240395.0059363097, 61.329999999999998];
+            const buildingCoord = new itowns.Coordinates(objectEPSG, objectPos[0], objectPos[1], objectPos[2]);
+
+            const extentSize = 200;
+            let extentCoord1 = new itowns.Coordinates(objectEPSG, objectPos[0] - extentSize, objectPos[1] - extentSize);
+            let extentCoord2 = new itowns.Coordinates(objectEPSG, objectPos[0] + extentSize, objectPos[1] + extentSize);
+
+            extentCoord1 = extentCoord1.as(viewExtentEPSG);
+            extentCoord2 = extentCoord2.as(viewExtentEPSG);
+
             const viewExtent = new itowns.Extent(
-                'EPSG:3947',
-                1351190.5369999579 - alpha, 1351190.5369999579 + alpha,
-                6240402.553999971 - alpha, 6240402.553999971 + alpha,
+                viewExtentEPSG,
+                extentCoord1.x, extentCoord2.x,
+                extentCoord1.y, extentCoord2.y
             );
 
             function createRenderer() {
@@ -112,6 +135,7 @@
                     scene3D: scene,
                     noControls: true
                 });
+
             customRenderer.setClearColor(0x000000, 0);
             setupLoadingScreen(viewerDiv, view);
             window.view = view;
@@ -151,9 +175,7 @@
                             model.name = 'model'
 
                             // building coordinate
-                            const coord = new itowns.Coordinates('EPSG:3947', 1351152.118201931, 6240395.0059363097, 61.329999999999998);
-
-                            model.position.copy(coord.as(view.referenceCrs));
+                            model.position.copy(buildingCoord.as(view.referenceCrs));
                             model.rotateX(90 * THREE.MathUtils.DEG2RAD);
 
                             // update coordinate of the mesh
@@ -185,16 +207,48 @@
             }
 
             function loadOrtho() {
-                // Define the source of the ortho-images
-                const sourceOrtho = new itowns.WMSSource({
-                    url: "https://wxs.ign.fr/inspire/inspire/r/wms",
-                    name: "OI.OrthoimageCoverage.HR",
-                    format: "image/png",
-                    crs: 'EPSG:2154',
-                    extent: viewExtent,
-                });
+                let sourceMap = null;
+                switch (settings.imageSourceType) {
+                    case IMAGE_SOURCE_TYPE.SATELLITE:
+                        console.log("SATELLITE");
+                        sourceMap = new itowns.WMSSource({
+                            url: "https://wxs.ign.fr/inspire/inspire/r/wms",
+                            name: "OI.OrthoimageCoverage.HR",
+                            format: "image/png",
+                            crs: orthoEPSG,
+                            extent: viewExtent
+                        });
+                        break;
+                    case IMAGE_SOURCE_TYPE.IGN_PLANV2:
+                        console.log("IGN_PLANV2");
+                        sourceMap = new itowns.WMSSource({
+                            url: "https://wxs.ign.fr/cartes/geoportail/r/wms",
+                            name: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2",
+                            format: "image/jpeg",
+                            crs: orthoEPSG,
+                            extent: viewExtent,
+                        });
+                        break;
+                    case IMAGE_SOURCE_TYPE.OMNISCALE_OPEN_STREET_MAP:
+                        console.log("OMNISCALE_OPEN_STREET_MAP");
+                        sourceMap = new itowns.WMSSource({
+                            url: `https://maps.omniscale.net/v2/${settings.omniscaleKey}/style.default/map`,
+                            name: "osm",
+                            format: "image/png",
+                            crs: orthoEPSG,
+                            extent: viewExtent,
+                            version: '1.1.0'
+                        });
+                        break;
+                }
+
+                if (sourceMap == null) {
+                    console.error("Source is null !");
+                    return;
+                }
+
                 // Create the ortho-images ColorLayer and add it to the view
-                layerOrtho = new itowns.ColorLayer('Fond de carte', { source: sourceOrtho });
+                layerOrtho = new itowns.ColorLayer('Fond de carte', { source: sourceMap });
                 return view.addLayer(layerOrtho);
             }
 
@@ -320,6 +374,9 @@
                 menuGlobe.addImageryLayersGUI([layerOrtho, layerGeoJson, layerGeoTiff]);
                 menuGlobe.addElevationLayerGUI(layerDEM);
 
+                menuGlobe.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
+                menuGlobe.gui.add(settings, 'omniscaleKey').name('Omniscale key').onChange(changeSourceImage);
+
                 const boundingSphere = new THREE.Box3().setFromObject(scene).getBoundingSphere(new THREE.Sphere());
                 boundingSphere.radius = boundingSphere.radius / 8;
                 controls.fitToSphere(boundingSphere, false);
@@ -337,6 +394,12 @@
                 viewerDiv.addEventListener("mousedown", (evt) => onMouseDown(evt), true);
 
                 animate();
+            }
+
+            function changeSourceImage() {
+                settings.imageSourceType = parseInt(settings.imageSourceType);
+                view.removeLayer('Fond de carte');
+                loadOrtho();
             }
         </script>
     </body>
