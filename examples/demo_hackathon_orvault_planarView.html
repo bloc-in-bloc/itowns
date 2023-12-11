@@ -52,6 +52,7 @@
             var controls;
             var clock = new THREE.Clock();
             var scene = new THREE.Scene();
+            var color = new itowns.THREE.Color();
 
             CameraControls.install( { THREE: THREE } );
 
@@ -140,6 +141,7 @@
             setupLoadingScreen(viewerDiv, view);
             window.view = view;
 
+            const debugMenu = new GuiTools('menuDiv', view);
             controls = new CameraControls(customCamera, viewerDiv);
 
             let layerOrtho;
@@ -153,7 +155,8 @@
                     loadOrtho(),
                     loadPointCloud(),
                     loadGeoJson(),
-                    loadGeoTiff()
+                    loadGeoTiff(),
+                    loadBuildings()
                 ])
                 .then(onAllLoaded);
 
@@ -161,6 +164,7 @@
                 const delta = clock.getDelta();
                 const updated = controls.update( delta );
                 if (updated) {
+                    // customRenderer.render(scene, customCamera);
                     view.notifyChange(customCamera);
                 }
                 requestAnimationFrame( animate );
@@ -210,7 +214,6 @@
                 let sourceMap = null;
                 switch (settings.imageSourceType) {
                     case IMAGE_SOURCE_TYPE.SATELLITE:
-                        console.log("SATELLITE");
                         sourceMap = new itowns.WMSSource({
                             url: "https://wxs.ign.fr/inspire/inspire/r/wms",
                             name: "OI.OrthoimageCoverage.HR",
@@ -220,17 +223,15 @@
                         });
                         break;
                     case IMAGE_SOURCE_TYPE.IGN_PLANV2:
-                        console.log("IGN_PLANV2");
                         sourceMap = new itowns.WMSSource({
                             url: "https://wxs.ign.fr/cartes/geoportail/r/wms",
                             name: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2",
                             format: "image/jpeg",
                             crs: orthoEPSG,
-                            extent: viewExtent,
+                            extent: viewExtent
                         });
                         break;
                     case IMAGE_SOURCE_TYPE.OMNISCALE_OPEN_STREET_MAP:
-                        console.log("OMNISCALE_OPEN_STREET_MAP");
                         sourceMap = new itowns.WMSSource({
                             url: `https://maps.omniscale.net/v2/${settings.omniscaleKey}/style.default/map`,
                             name: "osm",
@@ -341,6 +342,92 @@
                 });
             }
 
+            const orange = new itowns.THREE.Color(0xffa400);
+            const blue = new itowns.THREE.Color(0x47edff);
+            const black = new itowns.THREE.Color(0x000000);
+            const red = new itowns.THREE.Color(0xff0000);
+
+            function colorBuildings(properties, ctx) {
+                if (properties.usage_1 === 'Résidentiel') {
+                    color.set(0xFDFDFF);
+                } else if (properties.usage_1 === 'Annexe') {
+                    color.set(0xC6C5B9);
+                } else if (properties.usage_1 === 'Commercial et services') {
+                    color.set(0x62929E);
+                } else if (properties.usage_1 === 'Religieux') {
+                    color.set(0x393D3F);
+                } else if (properties.usage_1 === 'Sportif') {
+                    color.set(0x546A7B);
+                } else {
+                    color.set(0x555555);
+                }
+
+                /*
+                const distance = ctx.coordinates.planarDistanceTo(buildingCoord);
+                if (distance < 300) {
+                    return blue;
+                } else if (distance < 350){
+                    return black;
+                } else if (distance < 1000){
+                    return color;
+                } else if (distance < 1050){
+                    return red;
+                }
+                return color.lerp(orange, Math.min(distance / 4000, 1.0));
+                */
+                return color;
+            }
+
+
+            function extrudeBuildings(properties) {
+                return properties.hauteur;
+            }
+
+            function altitudeBuildings(properties) {
+                return properties.altitude_minimale_sol;
+            }
+
+            function acceptFeature(properties) {
+                return !!properties.hauteur;
+            }
+
+            function loadBuildings() {
+                var wfsBuildingSource = new itowns.WFSSource({
+                    url: 'https://wxs.ign.fr/topographie/geoportail/wfs?',
+                    version: '2.0.0',
+                    typeName: 'BDTOPO_V3:batiment',
+                    crs: 'EPSG:4326',
+                    ipr: 'IGN',
+                    format: 'application/json',
+                    extent: viewExtent
+                });
+
+                var wfsBuildingLayer = new itowns.FeatureGeometryLayer('Buildings', {
+                    batchId: function (property, featureId) { return featureId; },
+                    filter: acceptFeature,
+                    crs: 'EPSG:3947',
+                    source: wfsBuildingSource,
+                    zoom: { min: 1 },
+
+                    style: {
+                        fill: {
+                            color: colorBuildings,
+                            base_altitude: altitudeBuildings,
+                            extrusion_height: extrudeBuildings,
+                        }
+                    }
+                });
+
+                return view.addLayer(wfsBuildingLayer).then((layer) => {
+                    const gui = debug.GeometryDebug.createGeometryDebugUI(
+                        debugMenu.gui,
+                        view,
+                        layer
+                    );
+                    debug.GeometryDebug.addWireFrameCheckbox(gui, view, layer);
+                });
+            }
+
             function onMouseDown(event) {
                 let result = view.pickObjectsAt(event, 5);
 
@@ -374,12 +461,11 @@
                     debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
                 }
 
-                const menuGlobe = new GuiTools('menuDiv', view);
-                menuGlobe.addImageryLayersGUI([layerOrtho, layerGeoJson, layerGeoTiff]);
-                menuGlobe.addElevationLayerGUI(layerDEM);
+                debugMenu.addImageryLayersGUI([layerOrtho, layerGeoJson, layerGeoTiff]);
+                debugMenu.addElevationLayerGUI(layerDEM);
 
-                menuGlobe.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
-                menuGlobe.gui.add(settings, 'omniscaleKey').name('Omniscale key').onChange(changeSourceImage);
+                debugMenu.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
+                debugMenu.gui.add(settings, 'omniscaleKey').name('Omniscale key').onChange(changeSourceImage);
 
                 const boundingSphere = new THREE.Box3().setFromObject(scene).getBoundingSphere(new THREE.Sphere());
                 boundingSphere.radius = boundingSphere.radius / 8;
