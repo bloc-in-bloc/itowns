@@ -53,6 +53,8 @@
             var clock = new THREE.Clock();
             var scene = new THREE.Scene();
             var color = new itowns.THREE.Color();
+            var debugMenu;
+            var viewExtent;
 
             CameraControls.install( { THREE: THREE } );
 
@@ -78,25 +80,13 @@
             itowns.proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
             itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
 
+            let extentSize = 200;
             const viewExtentEPSG = "EPSG:3947";
             const orthoEPSG = viewExtentEPSG; // "EPSG:3947";
 
             const objectEPSG = "EPSG:3947";
             const objectPos = [1351152.118201931, 6240395.0059363097, 61.329999999999998];
             const buildingCoord = new itowns.Coordinates(objectEPSG, objectPos[0], objectPos[1], objectPos[2]);
-
-            const extentSize = 200;
-            let extentCoord1 = new itowns.Coordinates(objectEPSG, objectPos[0] - extentSize, objectPos[1] - extentSize);
-            let extentCoord2 = new itowns.Coordinates(objectEPSG, objectPos[0] + extentSize, objectPos[1] + extentSize);
-
-            extentCoord1 = extentCoord1.as(viewExtentEPSG);
-            extentCoord2 = extentCoord2.as(viewExtentEPSG);
-
-            const viewExtent = new itowns.Extent(
-                viewExtentEPSG,
-                extentCoord1.x, extentCoord2.x,
-                extentCoord1.y, extentCoord2.y
-            );
 
             function createRenderer() {
                 const renderer = new THREE.WebGLRenderer({
@@ -127,38 +117,14 @@
             var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 0.1, 1000);
             scene.add(customCamera);
 
-            view = new itowns.PlanarView(
-                viewerDiv,
-                viewExtent,
-                {
-                    camera: { cameraThree: customCamera },
-                    renderer: customRenderer,
-                    scene3D: scene,
-                    noControls: true
-                });
-
-            customRenderer.setClearColor(0x000000, 0);
-            setupLoadingScreen(viewerDiv, view);
-            window.view = view;
-
-            const debugMenu = new GuiTools('menuDiv', view);
-            controls = new CameraControls(customCamera, viewerDiv);
-
             let layerOrtho;
             let layerDEM;
             let layerGeoJson;
             let layerGeoTiff;
 
-            Promise.all([
-                    loadIfc(),
-                    loadElevation(),
-                    loadOrtho(),
-                    loadPointCloud(),
-                    loadGeoJson(),
-                    loadGeoTiff(),
-                    loadBuildings()
-                ])
-                .then(onAllLoaded);
+            loadView();
+
+            controls = new CameraControls(customCamera, viewerDiv);
 
             function animate() {
                 const delta = clock.getDelta();
@@ -168,6 +134,50 @@
                     view.notifyChange(customCamera);
                 }
                 requestAnimationFrame( animate );
+            }
+
+            function createExtent() {
+                let extentCoord1 = new itowns.Coordinates(objectEPSG, objectPos[0] - extentSize, objectPos[1] - extentSize);
+                let extentCoord2 = new itowns.Coordinates(objectEPSG, objectPos[0] + extentSize, objectPos[1] + extentSize);
+
+                extentCoord1 = extentCoord1.as(viewExtentEPSG);
+                extentCoord2 = extentCoord2.as(viewExtentEPSG);
+
+                viewExtent = new itowns.Extent(
+                    viewExtentEPSG,
+                    extentCoord1.x, extentCoord2.x,
+                    extentCoord1.y, extentCoord2.y
+                );
+            }
+
+            function loadView() {
+                createExtent();
+
+                view = new itowns.PlanarView(
+                    viewerDiv,
+                    viewExtent,
+                    {
+                        camera: { cameraThree: customCamera },
+                        renderer: customRenderer,
+                        scene3D: scene,
+                        noControls: true
+                    });
+
+                customRenderer.setClearColor(0x000000, 0);
+                setupLoadingScreen(viewerDiv, view);
+                window.view = view;
+                debugMenu = new GuiTools('menuDiv', view);
+
+                Promise.all([
+                    loadIfc(),
+                    loadElevation(),
+                    loadOrtho(),
+                    loadPointCloud(),
+                    loadGeoJson(),
+                    // loadGeoTiff(),
+                    loadBuildings()
+                ])
+                    .then(onAllLoaded);
             }
 
             function loadIfc() {
@@ -461,11 +471,30 @@
                     debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
                 }
 
-                debugMenu.addImageryLayersGUI([layerOrtho, layerGeoJson, layerGeoTiff]);
+                var imageryLayers = [];
+                if (layerOrtho !== undefined) {
+                    imageryLayers.push(layerOrtho);
+                }
+                if (layerGeoJson !== undefined) {
+                    imageryLayers.push(layerGeoJson);
+                }
+                if (layerGeoTiff !== undefined) {
+                    imageryLayers.push(layerGeoTiff);
+                }
+
+                debugMenu.addImageryLayersGUI(imageryLayers);
                 debugMenu.addElevationLayerGUI(layerDEM);
+
+                debugMenu.resize = function() {
+                    console.log("Resize extent");
+                    view.dispose();
+                    extentSize = extentSize * 2;
+                    loadView();
+                };
 
                 debugMenu.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
                 debugMenu.gui.add(settings, 'omniscaleKey').name('Omniscale key').onChange(changeSourceImage);
+                debugMenu.gui.add(debugMenu, 'resize').name('Resize view extent');
 
                 const boundingSphere = new THREE.Box3().setFromObject(scene).getBoundingSphere(new THREE.Sphere());
                 boundingSphere.radius = boundingSphere.radius / 8;
