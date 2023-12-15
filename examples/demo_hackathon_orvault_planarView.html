@@ -45,7 +45,6 @@
         <script src="js/ThreeLoader.js"></script>
         <script type="text/javascript">
             var potreeLayer;
-            var oldPostUpdate;
             var viewerDiv;
             var debugGui;
             var view;
@@ -86,10 +85,47 @@
             let extentSize = 200;
             const viewExtentEPSG = "EPSG:3947";
             const orthoEPSG = viewExtentEPSG; // "EPSG:3947";
+            const centerCoord = new itowns.Coordinates("EPSG:3947", 1351152.118201931, 6240395.0059363097, 61.329999999999998);
 
-            const objectEPSG = "EPSG:3947";
-            const objectPos = [1351152.118201931, 6240395.0059363097, 61.329999999999998];
-            const buildingCoord = new itowns.Coordinates(objectEPSG, objectPos[0], objectPos[1], objectPos[2]);
+            var customRenderer = createRenderer();
+            var rendererSize = customRenderer.getSize(new THREE.Vector2());
+            var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 0.1, 1000);
+            customCamera.up.set(0,1,0);
+            scene.add(customCamera);
+
+            let layerOrtho;
+            let layerDEM;
+            let layerGeoJson;
+            let layerGeoTiff;
+
+            createLights();
+            loadView();
+
+            controls = new CameraControls(customCamera, viewerDiv);
+
+            function animate() {
+                const delta = clock.getDelta();
+                const updated = controls.update( delta );
+                if (updated) {
+                    // customRenderer.render(scene, customCamera);
+                    view.notifyChange(customCamera);
+                }
+                requestAnimationFrame( animate );
+            }
+
+            function createLights() {
+                // Lights
+                const directionalLight1 = new THREE.DirectionalLight(0xffeeff, 0.8);
+                directionalLight1.position.set(1, 1, 1);
+                scene.add(directionalLight1);
+
+                const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight2.position.set(-1, 0.5, -1);
+                scene.add(directionalLight2);
+
+                const ambientLight = new THREE.AmbientLight(0xffffee, 0.25);
+                scene.add(ambientLight);
+            }
 
             function createRenderer() {
                 const renderer = new THREE.WebGLRenderer({
@@ -115,33 +151,9 @@
                 return renderer;
             }
 
-            var customRenderer = createRenderer();
-            var rendererSize = customRenderer.getSize(new THREE.Vector2());
-            var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 0.1, 1000);
-            scene.add(customCamera);
-
-            let layerOrtho;
-            let layerDEM;
-            let layerGeoJson;
-            let layerGeoTiff;
-
-            loadView();
-
-            controls = new CameraControls(customCamera, viewerDiv);
-
-            function animate() {
-                const delta = clock.getDelta();
-                const updated = controls.update( delta );
-                if (updated) {
-                    // customRenderer.render(scene, customCamera);
-                    view.notifyChange(customCamera);
-                }
-                requestAnimationFrame( animate );
-            }
-
             function createExtent() {
-                let extentCoord1 = new itowns.Coordinates(objectEPSG, objectPos[0] - extentSize, objectPos[1] - extentSize);
-                let extentCoord2 = new itowns.Coordinates(objectEPSG, objectPos[0] + extentSize, objectPos[1] + extentSize);
+                let extentCoord1 = new itowns.Coordinates(centerCoord.crs, centerCoord.x - extentSize, centerCoord.y - extentSize);
+                let extentCoord2 = new itowns.Coordinates(centerCoord.crs, centerCoord.x + extentSize, centerCoord.y + extentSize);
 
                 extentCoord1 = extentCoord1.as(viewExtentEPSG);
                 extentCoord2 = extentCoord2.as(viewExtentEPSG);
@@ -156,6 +168,17 @@
             function loadView() {
                 createExtent();
 
+                const rootObj = new THREE.Object3D();
+                rootObj.name = "iTownsViewRoot";
+                rootObj.rotateX(-90 * THREE.MathUtils.DEG2RAD);
+
+                const objChild = new THREE.Object3D();
+                objChild.name = "pivot";
+                objChild.position.copy(new THREE.Vector3(-centerCoord.x, -centerCoord.y, -centerCoord.z));
+                rootObj.add(objChild);
+
+                scene.add(rootObj);
+
                 view = new itowns.PlanarView(
                     viewerDiv,
                     viewExtent,
@@ -163,7 +186,8 @@
                         camera: { cameraThree: customCamera },
                         renderer: customRenderer,
                         scene3D: scene,
-                        noControls: true
+                        noControls: true,
+                        object3d: objChild
                     });
 
                 customRenderer.setClearColor(0x000000, 0);
@@ -191,15 +215,8 @@
                             const model = glb.scene;
                             model.name = 'model'
 
-                            // building coordinate
-                            model.position.copy(buildingCoord.as(view.referenceCrs));
-                            model.rotateX(90 * THREE.MathUtils.DEG2RAD);
-
                             // update coordinate of the mesh
                             model.updateMatrixWorld();
-
-                            const light = new THREE.DirectionalLight( 0xFFFFFF );
-                            scene.add(light);
 
                             scene.add(model);
                             ifcModel = model;
@@ -497,8 +514,15 @@
             }
 
             function onAllLoaded() {
+                const boundingSphere = new THREE.Box3().setFromObject(ifcModel).getBoundingSphere(new THREE.Sphere());
+                controls.fitToSphere(boundingSphere, false);
+                controls.rotate(0, 45 * THREE.MathUtils.DEG2RAD, false);
+
+                // Used to set the orbitPoint
+                viewerDiv.addEventListener("mousedown", (evt) => onMouseDown(evt), true);
+
                 if (potreeLayer != null) {
-                    debug.PotreeDebug.initTools(view, potreeLayer, debugGui);
+                    debug.PotreeDebug.initTools(view, potreeLayer, debugMenu.gui);
                 }
 
                 var imageryLayers = [];
@@ -526,11 +550,6 @@
                 debugMenu.gui.add(settings, 'omniscaleKey').name('Omniscale key').onChange(changeSourceImage);
                 debugMenu.gui.add(debugMenu, 'resize').name('Resize view extent');
 
-                const boundingSphere = new THREE.Box3().setFromObject(scene).getBoundingSphere(new THREE.Sphere());
-                boundingSphere.radius = boundingSphere.radius / 8;
-                controls.fitToSphere(boundingSphere, false);
-                controls.rotate(180 * THREE.MathUtils.DEG2RAD, -45 * THREE.MathUtils.DEG2RAD, false);
-
                 if (potreeLayer != null) {
                     // update stats window
                     var info = document.getElementById('info');
@@ -538,9 +557,6 @@
                         info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
                     });
                 }
-
-                // Used to set the orbitPoint
-                viewerDiv.addEventListener("mousedown", (evt) => onMouseDown(evt), true);
 
                 animate();
             }
