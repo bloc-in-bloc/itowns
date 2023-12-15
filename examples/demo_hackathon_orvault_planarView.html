@@ -55,6 +55,7 @@
             var color = new itowns.THREE.Color();
             var debugMenu;
             var viewExtent;
+            var pivot;
 
             CameraControls.install( { THREE: THREE } );
 
@@ -438,7 +439,21 @@
                 });
             }
 
+            function setOrbitPoint(point) {
+                if(pivot === undefined){
+                    console.log("create pivot");
+                    const geometry = new THREE.SphereGeometry( 1, 32, 16 );
+                    const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+                    const sphere = new THREE.Mesh( geometry, material );
+                    pivot = sphere;
+                    scene.add(pivot);
+                }
+                pivot.position.set(point.x, point.y, point.z);
+                controls.setOrbitPoint(point.x, point.y, point.z);
+            }
+
             function onMouseDown(event) {
+                customCamera.updateMatrixWorld();
                 let result = view.pickObjectsAt(event, 5);
 
                 const cameraPos = view.camera3D.getWorldPosition(new THREE.Vector3());
@@ -462,7 +477,7 @@
 
                 if (result.length > 0) {
                     const point = result[0].point;
-                    controls.setOrbitPoint(point.x, point.y, point.z);
+                    setOrbitPoint(point);
                 }
             }
 
