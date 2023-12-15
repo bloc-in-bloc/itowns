@@ -56,6 +56,8 @@
             var debugMenu;
             var viewExtent;
             var pivot;
+            var raycaster = new THREE.Raycaster();
+            var ifcModel;
 
             CameraControls.install( { THREE: THREE } );
 
@@ -200,6 +202,7 @@
                             scene.add(light);
 
                             scene.add(model);
+                            ifcModel = model;
                             view.notifyChange();
 
                             resolve();
@@ -439,9 +442,9 @@
                 });
             }
 
-            function setOrbitPoint(point) {
-                if(pivot === undefined){
-                    console.log("create pivot");
+            function setOrbitPoint(raycastObj) {
+                const point = raycastObj.point;
+                if (pivot === undefined) {
                     const geometry = new THREE.SphereGeometry( 1, 32, 16 );
                     const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
                     const sphere = new THREE.Mesh( geometry, material );
@@ -454,13 +457,16 @@
 
             function onMouseDown(event) {
                 customCamera.updateMatrixWorld();
-                let result = view.pickObjectsAt(event, 5);
+                raycaster.setFromCamera(view.eventToNormalizedCoords(event), customCamera);
+
+                const raycastResults = raycaster.intersectObjects(ifcModel.children, true);
+                let viewRaycastResults = view.pickObjectsAt(event, 5);
 
                 const cameraPos = view.camera3D.getWorldPosition(new THREE.Vector3());
                 const cameraPosCoord = new itowns.Coordinates(view.referenceCrs);
                 cameraPosCoord.setFromVector3(cameraPos);
 
-                result = result.map((r) => {
+                viewRaycastResults = viewRaycastResults.map((r) => {
                     if (r.layer.isTiledGeometryLayer) {
                         const coord = view.pickTerrainCoordinates(event);
                         const distance = coord.spatialEuclideanDistanceTo(cameraPosCoord);
@@ -473,11 +479,20 @@
                     }
                     return r;
                 });
-                result.sort((r1, r2) => r1.distance > r2.distance);
+                viewRaycastResults.sort((r1, r2) => r1.distance > r2.distance);
 
-                if (result.length > 0) {
-                    const point = result[0].point;
-                    setOrbitPoint(point);
+                if (viewRaycastResults.length > 0) {
+                    // Find index element to insert
+                    let index = 0;
+                    const elementToInsert = viewRaycastResults[0];
+                    while ((index < raycastResults.length) && (elementToInsert.distance > raycastResults[index].distance)) {
+                        index++;
+                    }
+                    raycastResults.splice(index, 0, elementToInsert);
+                }
+
+                if (raycastResults.length > 0) {
+                    setOrbitPoint(raycastResults[0]);
                 }
             }
 
