@@ -114,7 +114,6 @@
             }
 
             function createLights() {
-                // Lights
                 const directionalLight1 = new THREE.DirectionalLight(0xffeeff, 0.8);
                 directionalLight1.position.set(1, 1, 1);
                 scene.add(directionalLight1);
@@ -489,10 +488,8 @@
                         const distance = coord.spatialEuclideanDistanceTo(cameraPosCoord);
                         r.distance = distance;
 
-                        var direction = new THREE.Vector3();
-                        direction.subVectors(coord.toVector3(), cameraPosCoord).normalize();
-                        var point = cameraPos.clone().add(direction.multiplyScalar(distance));
-                        r.point = point;
+                        r.point = new THREE.Vector3();
+                        coord.toVector3(r.point);
                     }
                     return r;
                 });
