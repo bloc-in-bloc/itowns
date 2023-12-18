@@ -485,11 +485,11 @@
                 viewRaycastResults = viewRaycastResults.map((r) => {
                     if (r.layer.isTiledGeometryLayer) {
                         const coord = view.pickTerrainCoordinates(event);
-                        const distance = coord.spatialEuclideanDistanceTo(cameraPosCoord);
-                        r.distance = distance;
-
+                        // Get position from coord
                         r.point = new THREE.Vector3();
                         coord.toVector3(r.point);
+                        // Compute distance between point and camera
+                        r.distance = r.point.distanceTo(cameraPos);
                     }
                     return r;
                 });
