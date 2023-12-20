@@ -190,6 +190,9 @@
                         object3d: objChild
                     });
 
+                view.tileLayer.disableSkirt = true;
+                view.tileLayer.opacity = settings.opacity;
+
                 customRenderer.setClearColor(0x000000, 0);
                 setupLoadingScreen(viewerDiv, view);
                 window.view = view;
