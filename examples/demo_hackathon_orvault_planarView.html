@@ -73,7 +73,8 @@
 
             const settings = {
                 imageSourceType: IMAGE_SOURCE_TYPE.SATELLITE,
-                omniscaleKey: ""
+                omniscaleKey: "",
+                opacity: 1
             }
 
             // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
@@ -475,7 +476,7 @@
                 customCamera.updateMatrixWorld();
                 raycaster.setFromCamera(view.eventToNormalizedCoords(event), customCamera);
 
-                const raycastResults = raycaster.intersectObjects(ifcModel.children, true);
+                const raycastResults = ifcModel !== undefined ? raycaster.intersectObjects(ifcModel.children, true) : [];
                 let viewRaycastResults = view.pickObjectsAt(event, 5);
 
                 const cameraPos = view.camera3D.getWorldPosition(new THREE.Vector3());
@@ -511,7 +512,11 @@
             }
 
             function onAllLoaded() {
-                const boundingSphere = new THREE.Box3().setFromObject(ifcModel).getBoundingSphere(new THREE.Sphere());
+                view.tileLayer.object3d.traverse((obj) => {
+                    console.log(obj);
+                });
+
+                const boundingSphere = new THREE.Box3().setFromObject(view.tileLayer.object3d).getBoundingSphere(new THREE.Sphere());
                 controls.fitToSphere(boundingSphere, false);
                 controls.rotate(0, 45 * THREE.MathUtils.DEG2RAD, false);
 
@@ -534,7 +539,9 @@
                 }
 
                 debugMenu.addImageryLayersGUI(imageryLayers);
-                debugMenu.addElevationLayerGUI(layerDEM);
+                if (layerDEM !== undefined) {
+                    debugMenu.addElevationLayerGUI(layerDEM);
+                }
 
                 debugMenu.resize = function() {
                     console.log("Resize extent");
@@ -546,6 +553,7 @@
                 debugMenu.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
                 debugMenu.gui.add(settings, 'omniscaleKey').name('Omniscale key').onChange(changeSourceImage);
                 debugMenu.gui.add(debugMenu, 'resize').name('Resize view extent');
+                debugMenu.gui.add(settings, 'opacity', 0.0, 1.0, 0.01).name('Global opacity').onChange(updateOpacity);
 
                 if (potreeLayer != null) {
                     // update stats window
@@ -562,6 +570,11 @@
                 settings.imageSourceType = parseInt(settings.imageSourceType);
                 view.removeLayer('Fond de carte');
                 loadOrtho();
+            }
+
+            function updateOpacity() {
+                view.tileLayer.opacity = settings.opacity;
+                view.notifyChange();
             }
         </script>
     </body>
