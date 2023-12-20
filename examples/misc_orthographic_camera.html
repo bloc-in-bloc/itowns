@@ -36,12 +36,24 @@
                 '+towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
             );
 
-            // define geographic extent : CRS, min/max X, min/max Y
-            const extent = new itowns.Extent(
-                'EPSG:3946',
-                1837816.94334, 1847692.32501,
-                5170036.45870, 5178412.82698,
+            itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+            itowns.proj4.defs(
+                'EPSG:2154',
+                '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
             );
+            itowns.proj4.defs(
+                'EPSG:3857',
+                '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +wktext +no_defs +type=crs'
+            );
+
+        // define geographic extent : CRS, min/max X, min/max Y
+            const alpha = 200;
+            const extent = new itowns.Extent(
+                'EPSG:3947',
+                1351190.5369999579 - alpha, 1351190.5369999579 + alpha,
+                6240402.553999971 - alpha, 6240402.553999971 + alpha,
+            );
+
 
             // `viewerDiv` will contain iTowns' rendering area (`<canvas>`)
             const viewerDiv = document.getElementById('viewerDiv');
@@ -50,23 +62,22 @@
             // The extent passed in `placement` is the area that will be displayed by camera.
             const view = new itowns.PlanarView(viewerDiv, extent, {
                 camera: { type: itowns.CAMERA_TYPE.ORTHOGRAPHIC },
-                placement: new itowns.Extent('EPSG:3946', 1838000, 1842000, 5172000, 5174000),
+                placement: extent,
                 controls: {
                     // limit the zoom to a resolution interval
                     maxResolution: 0.01,  // a pixel shall not represent a metric size smaller than 1 cm
-                    minResolution: 100, // a pixel shall not represent a metric size larger than 100m
+                    minResolution: 5000, // a pixel shall not represent a metric size larger than 100m
                 }
             });
             setupLoadingScreen(viewerDiv, view);
 
             // add a WMS imagery source
-            const wmsImagerySource = new itowns.WMSSource({
-                extent: extent,
-                name: 'ortho_latest',
-                url: 'https://imagerie.data.grandlyon.com/wms/grandlyon',
-                version: '1.3.0',
-                crs: 'EPSG:3946',
-                format: 'image/jpeg',
+            wmsImagerySource = new itowns.WMSSource({
+                url: "https://wxs.ign.fr/inspire/inspire/r/wms",
+                name: "OI.OrthoimageCoverage.HR",
+                format: "image/png",
+                crs: 'EPSG:2154',
+                extent: extent
             });
             // add a WMS imagery layer
             const wmsImageryLayer = new itowns.ColorLayer('wms_imagery', {
@@ -74,6 +85,17 @@
             });
             view.addLayer(wmsImageryLayer);
 
+            // Define the source of the dem data
+            const sourceDEM = new itowns.WMSSource({
+                url: "https://wxs.ign.fr/altimetrie/geoportail/r/wms",
+                name: "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES",
+                format: "image/x-bil;bits=32",
+                crs: 'EPSG:2154',
+                extent: extent,
+            });
+            // Create the dem ElevationLayer and add it to the view
+            const layerDEM = new itowns.ElevationLayer('DEM', { source: sourceDEM });
+            view.addLayer(layerDEM);
             // Add a scale :
             const scale = new itowns_widgets.Scale(view, {
                 position: 'bottom-right',
@@ -88,6 +110,21 @@
                 const menu = new GuiTools('menuDiv', view);
                 debug.createTileDebugUI(menu.gui, view);
             }
+
+            // Configure Point Cloud layer
+            potreeLayer = new itowns.PotreeLayer('cloud', {
+                source: new itowns.PotreeSource({
+                    file: 'cloud.js',
+                    url: 'https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/OrvaultCC47_Potree1_7_3947',
+                    crs: 'EPSG:3947',
+                }),
+            });
+
+            // add potreeLayer to scene
+            window.view = view;
+
+            itowns.View.prototype.addLayer.call(view, potreeLayer);
+
         </script>
     </body>
 </html>
