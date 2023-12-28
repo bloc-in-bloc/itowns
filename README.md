@@ -129,3 +129,35 @@ The governance of the project is open and explicited [here](https://github.com/i
 
 [![IGN](./img/logo_ign.png)](https://www.ign.fr)
 [![CIRIL Group](./img/CIRIL_Group_logo.png)](https://www.cirilgroup.com/en/)
+
+
+# Troubleshooting
+
+## Multipage TIFF
+
+Multipage tiff can be created using Subdatasets like this : 
+
+
+To merge into one file you have to get Gdal and Gdal python :
+
+pip install --no-cache-dir --force-reinstall 'GDAL[numpy]==3.11'
+
+and then use gdaltranslate to create file for each subdatasets : 
+
+gdal_translate -sds input.tif tmp_outs.tif
+
+then create a list of file to merge for the next commands using (you have to have only output tiff files in the folder)
+
+ls -1 *.tif > tiff_list.txt 
+
+then using gdal_merge
+
+gdal_merge.py -o mosaic.tif --optfile tiff_list.txt
+
+and you get a geotiff with only one page.
+
+Tested pipelines that does not work : 
+gdalbuildvrt / geotiff bands
+
+
+
