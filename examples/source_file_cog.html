@@ -34,8 +34,25 @@
         <script src="js/plugins/COGSource.js"></script>
         <script type="text/javascript">
             itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+            itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+
+            const pool = new GeoTIFF.Pool();
+            const size = 500;
+            const crs = "EPSG:2154";
+
+            const longitude = 811883;
+            const latitude = 6490783;
+
+            const extent = new itowns.Extent(
+                crs,
+                longitude - size, longitude + size,
+                latitude - size, latitude + size,
+            );
+            const center = extent.center();
 
             var viewerDiv = document.getElementById('viewerDiv');
+
+            loadCOGS();
 
             function readCOGURL() {
                 var url = document.getElementById('cog_url').value || new URLSearchParams(window.location.search).get('geotiff');
@@ -56,29 +73,46 @@
                 readCOGURL();
             }
 
-            function loadCOG(url) {
+            async function loadCOGS() {
+                const firstPages = [];
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page1_cog.tif", "page1", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page2_cog.tif", "page2", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page3_cog.tif", "page3", crs));
+
+                await Promise.all(firstPages);
+/*
+                const secondPages = [];
+                secondPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page4_cog_2154.tif", "page4", crs));
+                secondPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page5_cog_2154.tif", "page5", crs));
+                secondPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page6_cog_2154.tif", "page6", crs));
+
+                await Promise.all(secondPages);
+                */
+            }
+
+            function loadCOG(url, name, crs) {
                 // create a source from a Cloud Optimized GeoTiff
                 var cogSource = new COGSource({
                     url: url,
-                    crs: "EPSG:2154",
-                    // Default resample method is 'nearest', 'bilinear' looks better when zoomed
-                    resampleMethod: 'bilinear'
+                    crs: crs,
+                    pool: pool
                 });
 
-                cogSource.whenReady.then(() => {
-                    var view = new itowns.PlanarView(viewerDiv, cogSource.extent, {
-                        // Default maxSubdivisionLevel is 5, so with huge geotiff it's not enough to see details when zoomed
-                        maxSubdivisionLevel: 10,
-                        disableSkirt: true,
-                        placement: { tilt: 90 }
-                    });
-                    setupLoadingScreen(viewerDiv, view);
-                    new itowns.PlanarControls(view, {});
-                    var cogLayer = new itowns.ColorLayer('cog', {
+                return cogSource.whenReady.then(() => {
+                    if (this.view === undefined) {
+                        view = createView();
+                    }
+                    var cogLayer = new itowns.ColorLayer(name, {
                         source: cogSource,
                     });
-                    view.addLayer(cogLayer);
+                    return this.view.addLayer(cogLayer);
                 });
+            }
+
+            function createView() {
+                const view = new itowns.PlanarView(viewerDiv, extent, { disableSkirt: true, placement: { coord: new itowns.Coordinates(crs, center.x, center.y, 500) } });
+                new itowns.PlanarControls(view, {});
+                return view;
             }
 
             readCOGURL();
