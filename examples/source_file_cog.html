@@ -37,11 +37,11 @@
             itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
 
             const pool = new GeoTIFF.Pool();
-            const size = 500;
+            const size = 300;
             const crs = "EPSG:2154";
 
-            const longitude = 811883;
-            const latitude = 6490783;
+            const longitude = 650877.1356480455724522;
+            const latitude = 6859622.6107152318581939;
 
             const extent = new itowns.Extent(
                 crs,
@@ -75,9 +75,14 @@
 
             async function loadCOGS() {
                 const firstPages = [];
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page1_cog.tif", "page1", crs));
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page2_cog.tif", "page2", crs));
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition/page3_cog.tif", "page3", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page1.tif", "page1", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page2.tif", "page2", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page3", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page4", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page5", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page6", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page7", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page8", crs));
 
                 await Promise.all(firstPages);
 /*
