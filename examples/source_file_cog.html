@@ -37,7 +37,7 @@
             itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
 
             const pool = new GeoTIFF.Pool();
-            const size = 300;
+            const size = 1000;
             const crs = "EPSG:2154";
 
             const longitude = 650877.1356480455724522;
@@ -78,11 +78,11 @@
                 firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page1.tif", "page1", crs));
                 firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page2.tif", "page2", crs));
                 firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page3", crs));
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page4", crs));
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page5", crs));
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page6", crs));
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page7", crs));
-                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page3.tif", "page8", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page4.tif", "page4", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page5.tif", "page5", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page6.tif", "page6", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page7.tif", "page7", crs));
+                firstPages.push(loadCOG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/cog_superposition2/page8.tif", "page8", crs));
 
                 await Promise.all(firstPages);
 /*
@@ -104,18 +104,24 @@
                 });
 
                 return cogSource.whenReady.then(() => {
+                    console.log(cogSource.zoom);
                     if (this.view === undefined) {
                         view = createView();
                     }
                     var cogLayer = new itowns.ColorLayer(name, {
                         source: cogSource,
                     });
+                    /*
+                    var cogLayer = new itowns.ColorLayer(name, {
+                        source: cogSource,
+                    });
+                    */
                     return this.view.addLayer(cogLayer);
                 });
             }
 
             function createView() {
-                const view = new itowns.PlanarView(viewerDiv, extent, { disableSkirt: true, placement: { coord: new itowns.Coordinates(crs, center.x, center.y, 500) } });
+                const view = new itowns.PlanarView(viewerDiv, extent, { maxSubdivisionLevel: 8, disableSkirt: true, placement: { coord: new itowns.Coordinates(crs, center.x, center.y, 500) } });
                 new itowns.PlanarControls(view, {});
                 return view;
             }
