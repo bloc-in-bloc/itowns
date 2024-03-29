@@ -236,7 +236,7 @@
             function loadElevation() {
                 // Define the source of the dem data
                 const sourceDEM = new itowns.WMSSource({
-                    url: "https://wxs.ign.fr/altimetrie/geoportail/r/wms",
+                    url: "https://data.geopf.fr/wms-r/wms?",
                     name: "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES",
                     format: "image/x-bil;bits=32",
                     crs: 'EPSG:2154',
@@ -252,7 +252,7 @@
                 switch (settings.imageSourceType) {
                     case IMAGE_SOURCE_TYPE.SATELLITE:
                         sourceMap = new itowns.WMSSource({
-                            url: "https://wxs.ign.fr/inspire/inspire/r/wms",
+                            url: "https://data.geopf.fr/wms-r/wms?",
                             name: "OI.OrthoimageCoverage.HR",
                             format: "image/png",
                             crs: orthoEPSG,
@@ -261,7 +261,7 @@
                         break;
                     case IMAGE_SOURCE_TYPE.IGN_PLANV2:
                         sourceMap = new itowns.WMSSource({
-                            url: "https://wxs.ign.fr/cartes/geoportail/r/wms",
+                            url: "https://data.geopf.fr/wms-r/wms?",
                             name: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2",
                             format: "image/jpeg",
                             crs: orthoEPSG,
