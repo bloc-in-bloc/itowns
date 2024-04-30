@@ -65,7 +65,6 @@
     "copc": "^0.0.6",
     "earcut": "^2.2.4",
     "js-priority-queue": "^0.1.5",
-    "jsbi": "^4.3.0",
     "pbf": "^3.2.1",
     "shpjs": "^4.0.4",
     "threads": "^1.7.0"
@@ -93,7 +92,6 @@
     "c8": "^9.1.0",
     "chalk": "^5.3.0",
     "chart.js": "^4.4.1",
-    "babel-plugin-transform-jsbi-to-bigint": "^1.4.0",
     "compare-func": "^2.0.0",
     "conventional-changelog-cli": "^4.1.0",
     "copyfiles": "^2.4.1",
