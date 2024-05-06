@@ -59,6 +59,9 @@ module.exports = () => {
                 import: './src/Utils/gui/Main.js',
                 dependOn: 'itowns',
             },
+            itowns_lasparser: {
+                import: './src/Worker/LASLoaderWorker.js',
+            },
         },
         devtool: 'source-map',
         output: {

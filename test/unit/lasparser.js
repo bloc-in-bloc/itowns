@@ -17,6 +17,7 @@ describe('LASParser', function () {
         const networkOptions = process.env.HTTPS_PROXY ? { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY) } : {};
         lasData = await Fetcher.arrayBuffer(lasUrl, networkOptions);
         lazV14Data = await Fetcher.arrayBuffer(lazV14Url, networkOptions);
+        console.log('0');
     }).timeout(4000);
 
     describe('unit tests', function () {
@@ -40,6 +41,8 @@ describe('LASParser', function () {
             assert.ok(compareWithEpsilon(bufferGeometry.boundingBox.max.x + origin.x, header.max[0], epsilon));
             assert.ok(compareWithEpsilon(bufferGeometry.boundingBox.max.y + origin.y, header.max[1], epsilon));
             assert.ok(compareWithEpsilon(bufferGeometry.boundingBox.max.z + origin.z, header.max[2], epsilon));
+
+            console.log('1');
         });
 
         it('parses a laz file to a THREE.BufferGeometry', async function () {
@@ -59,6 +62,13 @@ describe('LASParser', function () {
             assert.ok(compareWithEpsilon(bufferGeometry.boundingBox.max.x + origin.x, header.max[0], epsilon));
             assert.ok(compareWithEpsilon(bufferGeometry.boundingBox.max.y + origin.y, header.max[1], epsilon));
             assert.ok(compareWithEpsilon(bufferGeometry.boundingBox.max.z + origin.z, header.max[2], epsilon));
+
+            console.log('2');
         });
+    });
+
+    after(async function () {
+        await LASParser.terminate();
+        console.log('After');
     });
 });
