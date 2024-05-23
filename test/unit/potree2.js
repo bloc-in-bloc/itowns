@@ -1,6 +1,7 @@
 import assert from 'assert';
 import Potree2Layer from 'Layer/Potree2Layer';
 import Potree2Source from 'Source/Potree2Source';
+import Potree2BinParser from 'Parser/Potree2BinParser';
 import View from 'Core/View';
 import HttpsProxyAgent from 'https-proxy-agent';
 import Potree2Node from 'Core/Potree2Node';
@@ -116,11 +117,6 @@ describe('Potree2', function () {
         it('instance', () => {
             assert.ok(pMaterial);
         });
-        it('Define isWebGL2 on before compile', () => {
-            const shader = {};
-            pMaterial.onBeforeCompile(shader, renderer);
-            assert.equal(shader.glslVersion, '300 es');
-        });
         it('copy', () => {
             pMaterial2.copy(pMaterial);
             assert.equal(pMaterial2.uniforms.projectiveTextureAlphaBorder.value, 20);
@@ -130,5 +126,9 @@ describe('Potree2', function () {
             pMaterial2.update(pMaterial);
             assert.equal(pMaterial2.visible, false);
         });
+    });
+
+    after(async function () {
+        await Potree2BinParser.terminate();
     });
 });

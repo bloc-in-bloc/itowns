@@ -34,7 +34,6 @@ of the authors and should not be interpreted as representing official policies,
  */
 
 import { PointAttribute, PointAttributeTypes } from 'Core/Potree2PointAttributes';
-import { decompress } from 'brotli-compress';
 
 const typedArrayMapping = {
     int8: Int8Array,
@@ -49,62 +48,18 @@ const typedArrayMapping = {
     double: Float64Array,
 };
 
-function dealign24b(mortoncode) {
-    // see https://stackoverflow.com/questions/45694690/how-i-can-remove-all-odds-bits-in-c
+export default function load(buffer, options) {
+    const { pointAttributes, scale, min, size, offset, numPoints } = options;
 
-    // input alignment of desired bits
-    // ..a..b..c..d..e..f..g..h..i..j..k..l..m..n..o..p
-    let x = mortoncode;
-
-    //          ..a..b..c..d..e..f..g..h..i..j..k..l..m..n..o..p                     ..a..b..c..d..e..f..g..h..i..j..k..l..m..n..o..p
-    //          ..a.....c.....e.....g.....i.....k.....m.....o...                     .....b.....d.....f.....h.....j.....l.....n.....p
-    //          ....a.....c.....e.....g.....i.....k.....m.....o.                     .....b.....d.....f.....h.....j.....l.....n.....p
-    x = ((x & 0b001000001000001000001000) >> 2) | ((x & 0b000001000001000001000001) >> 0);
-    //          ....ab....cd....ef....gh....ij....kl....mn....op                     ....ab....cd....ef....gh....ij....kl....mn....op
-    //          ....ab..........ef..........ij..........mn......                     ..........cd..........gh..........kl..........op
-    //          ........ab..........ef..........ij..........mn..                     ..........cd..........gh..........kl..........op
-    x = ((x & 0b000011000000000011000000) >> 4) | ((x & 0b000000000011000000000011) >> 0);
-    //          ........abcd........efgh........ijkl........mnop                     ........abcd........efgh........ijkl........mnop
-    //          ........abcd....................ijkl............                     ....................efgh....................mnop
-    //          ................abcd....................ijkl....                     ....................efgh....................mnop
-    x = ((x & 0b000000001111000000000000) >> 8) | ((x & 0b000000000000000000001111) >> 0);
-    //          ................abcdefgh................ijklmnop                     ................abcdefgh................ijklmnop
-    //          ................abcdefgh........................                     ........................................ijklmnop
-    //          ................................abcdefgh........                     ........................................ijklmnop
-    x = ((x & 0b000000000000000000000000) >> 16) | ((x & 0b000000000000000011111111) >> 0);
-
-    // sucessfully realigned!
-    // ................................abcdefghijklmnop
-
-    return x;
-}
-
-onmessage = async function processMessage(event) {
-    const {
-        pointAttributes,
-        scale,
-        name,
-        min,
-        size,
-        offset,
-        numPoints,
-    } = event.data;
-
-    let buffer;
-    if (numPoints === 0) {
-        buffer = { buffer: new ArrayBuffer(0) };
-    } else {
-        try {
-            buffer = await decompress(new Int8Array(event.data.buffer));
-        } catch (e) {
-            buffer = { buffer: new ArrayBuffer(numPoints * (pointAttributes.byteSize + 12)) };
-            console.error(`problem with node ${name}: `, e);
-        }
-    }
-
-    const view = new DataView(buffer.buffer);
+    const view = new DataView(buffer);
 
     const attributeBuffers = {};
+    let attributeOffset = 0;
+
+    let bytesPerPoint = 0;
+    for (const pointAttribute of pointAttributes.attributes) {
+        bytesPerPoint += pointAttribute.byteSize;
+    }
 
     const gridSize = 32;
     const grid = new Uint32Array(gridSize ** 3);
@@ -124,45 +79,17 @@ onmessage = async function processMessage(event) {
     };
 
     let numOccupiedCells = 0;
-    let byteOffset = 0;
     for (const pointAttribute of pointAttributes.attributes) {
         if (['POSITION_CARTESIAN', 'position'].includes(pointAttribute.name)) {
             const buff = new ArrayBuffer(numPoints * 4 * 3);
             const positions = new Float32Array(buff);
 
             for (let j = 0; j < numPoints; j++) {
-                const mc_0 = view.getUint32(byteOffset + 4, true);
-                const mc_1 = view.getUint32(byteOffset + 0, true);
-                const mc_2 = view.getUint32(byteOffset + 12, true);
-                const mc_3 = view.getUint32(byteOffset + 8, true);
+                const pointOffset = j * bytesPerPoint;
 
-                byteOffset += 16;
-
-                let X = dealign24b((mc_3 & 0x00FFFFFF) >>> 0)
-                    | (dealign24b(((mc_3 >>> 24) | (mc_2 << 8)) >>> 0) << 8);
-
-                let Y = dealign24b((mc_3 & 0x00FFFFFF) >>> 1)
-                    | (dealign24b(((mc_3 >>> 24) | (mc_2 << 8)) >>> 1) << 8);
-
-
-                let Z = dealign24b((mc_3 & 0x00FFFFFF) >>> 2)
-                    | (dealign24b(((mc_3 >>> 24) | (mc_2 << 8)) >>> 2) << 8);
-
-
-                if (mc_1 != 0 || mc_2 != 0) {
-                    X = X | (dealign24b((mc_1 & 0x00FFFFFF) >>> 0) << 16)
-                        | (dealign24b(((mc_1 >>> 24) | (mc_0 << 8)) >>> 0) << 24);
-
-                    Y = Y | (dealign24b((mc_1 & 0x00FFFFFF) >>> 1) << 16)
-                        | (dealign24b(((mc_1 >>> 24) | (mc_0 << 8)) >>> 1) << 24);
-
-                    Z = Z | (dealign24b((mc_1 & 0x00FFFFFF) >>> 2) << 16)
-                        | (dealign24b(((mc_1 >>> 24) | (mc_0 << 8)) >>> 2) << 24);
-                }
-
-                const x = parseInt(X, 10) * scale[0] + offset[0] - min.x;
-                const y = parseInt(Y, 10) * scale[1] + offset[1] - min.y;
-                const z = parseInt(Z, 10) * scale[2] + offset[2] - min.z;
+                const x = (view.getInt32(pointOffset + attributeOffset + 0, true) * scale[0]) + offset[0] - min.x;
+                const y = (view.getInt32(pointOffset + attributeOffset + 4, true) * scale[1]) + offset[1] - min.y;
+                const z = (view.getInt32(pointOffset + attributeOffset + 8, true) * scale[2]) + offset[2] - min.z;
 
                 const index = toIndex(x, y, z);
                 const count = grid[index]++;
@@ -175,37 +102,24 @@ onmessage = async function processMessage(event) {
                 positions[3 * j + 2] = z;
             }
 
-            attributeBuffers[pointAttribute.name] = {
-                buffer: buff,
-                attribute: pointAttribute,
-            };
+            attributeBuffers[pointAttribute.name] = { buffer: buff, attribute: pointAttribute };
         } else if (['RGBA', 'rgba'].includes(pointAttribute.name)) {
             const buff = new ArrayBuffer(numPoints * 4);
             const colors = new Uint8Array(buff);
 
             for (let j = 0; j < numPoints; j++) {
-                const mc_0 = view.getUint32(byteOffset + 4, true);
-                const mc_1 = view.getUint32(byteOffset + 0, true);
-                byteOffset += 8;
+                const pointOffset = j * bytesPerPoint;
 
-                const r = dealign24b((mc_1 & 0x00FFFFFF) >>> 0)
-                    | (dealign24b(((mc_1 >>> 24) | (mc_0 << 8)) >>> 0) << 8);
-
-                const g = dealign24b((mc_1 & 0x00FFFFFF) >>> 1)
-                    | (dealign24b(((mc_1 >>> 24) | (mc_0 << 8)) >>> 1) << 8);
-
-                const b = dealign24b((mc_1 & 0x00FFFFFF) >>> 2)
-                    | (dealign24b(((mc_1 >>> 24) | (mc_0 << 8)) >>> 2) << 8);
+                const r = view.getUint16(pointOffset + attributeOffset + 0, true);
+                const g = view.getUint16(pointOffset + attributeOffset + 2, true);
+                const b = view.getUint16(pointOffset + attributeOffset + 4, true);
 
                 colors[4 * j + 0] = r > 255 ? r / 256 : r;
                 colors[4 * j + 1] = g > 255 ? g / 256 : g;
                 colors[4 * j + 2] = b > 255 ? b / 256 : b;
             }
 
-            attributeBuffers[pointAttribute.name] = {
-                buffer: buff,
-                attribute: pointAttribute,
-            };
+            attributeBuffers[pointAttribute.name] = { buffer: buff, attribute: pointAttribute };
         } else {
             const buff = new ArrayBuffer(numPoints * 4);
             const f32 = new Float32Array(buff);
@@ -235,8 +149,8 @@ onmessage = async function processMessage(event) {
             }
 
             for (let j = 0; j < numPoints; j++) {
-                const value = getter(byteOffset, true);
-                byteOffset += pointAttribute.byteSize;
+                const pointOffset = j * bytesPerPoint;
+                const value = getter(pointOffset + attributeOffset, true);
 
                 f32[j] = (value - offset) * scale;
                 preciseBuffer[j] = value;
@@ -250,6 +164,8 @@ onmessage = async function processMessage(event) {
                 scale,
             };
         }
+
+        attributeOffset += pointAttribute.byteSize;
     }
 
     const occupancy = parseInt(numPoints / numOccupiedCells, 10);
@@ -262,10 +178,7 @@ onmessage = async function processMessage(event) {
             indices[i] = i;
         }
 
-        attributeBuffers.INDICES = {
-            buffer: buff,
-            attribute: PointAttribute.INDICES,
-        };
+        attributeBuffers.INDICES = { buffer: buff, attribute: PointAttribute.INDICES };
     }
 
 
@@ -273,10 +186,7 @@ onmessage = async function processMessage(event) {
         const vectors = pointAttributes.vectors;
 
         for (const vector of vectors) {
-            const {
-                name,
-                attributes,
-            } = vector;
+            const { name, attributes } = vector;
             const numVectorElements = attributes.length;
             const buffer = new ArrayBuffer(numVectorElements * numPoints * 4);
             const f32 = new Float32Array(buffer);
@@ -284,10 +194,7 @@ onmessage = async function processMessage(event) {
             let iElement = 0;
             for (const sourceName of attributes) {
                 const sourceBuffer = attributeBuffers[sourceName];
-                const {
-                    offset,
-                    scale,
-                } = sourceBuffer;
+                const { offset, scale } = sourceBuffer;
                 const view = new DataView(sourceBuffer.buffer);
 
                 const getter = view.getFloat32.bind(view);
@@ -310,16 +217,9 @@ onmessage = async function processMessage(event) {
         }
     }
 
-    const message = {
+    return {
         buffer,
         attributeBuffers,
         density: occupancy,
     };
-
-    const transferables = [];
-    Object.keys(message.attributeBuffers).forEach((property) => {
-        transferables.push(message.attributeBuffers[property].buffer);
-    });
-
-    postMessage(message, transferables);
-};
+}

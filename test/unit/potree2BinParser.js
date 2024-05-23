@@ -177,4 +177,8 @@ describe('Potree2BinParser', function () {
             })
             .catch(done);
     });
+
+    after(async function () {
+        await Potree2BinParser.terminate();
+    });
 });
