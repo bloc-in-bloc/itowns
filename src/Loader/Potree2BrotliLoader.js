@@ -79,30 +79,22 @@ function dealign24b(mortoncode) {
     return x;
 }
 
-onmessage = async function processMessage(event) {
-    const {
-        pointAttributes,
-        scale,
-        name,
-        min,
-        size,
-        offset,
-        numPoints,
-    } = event.data;
+export default async function load(buffer, options) {
+    const { pointAttributes, scale, min, size, offset, numPoints } = options;
 
-    let buffer;
+    let bytes;
     if (numPoints === 0) {
-        buffer = { buffer: new ArrayBuffer(0) };
+        bytes = { buffer: new ArrayBuffer(0) };
     } else {
         try {
-            buffer = await decompress(new Int8Array(event.data.buffer));
+            bytes = await decompress(new Int8Array(buffer));
         } catch (e) {
-            buffer = { buffer: new ArrayBuffer(numPoints * (pointAttributes.byteSize + 12)) };
+            bytes = { buffer: new ArrayBuffer(numPoints * (pointAttributes.byteSize + 12)) };
             console.error(`problem with node ${name}: `, e);
         }
     }
 
-    const view = new DataView(buffer.buffer);
+    const view = new DataView(bytes.buffer);
 
     const attributeBuffers = {};
 
@@ -310,16 +302,9 @@ onmessage = async function processMessage(event) {
         }
     }
 
-    const message = {
+    return {
         buffer,
         attributeBuffers,
         density: occupancy,
     };
-
-    const transferables = [];
-    Object.keys(message.attributeBuffers).forEach((property) => {
-        transferables.push(message.attributeBuffers[property].buffer);
-    });
-
-    postMessage(message, transferables);
-};
+}

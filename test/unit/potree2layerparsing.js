@@ -4,7 +4,6 @@ import Potree2Source from 'Source/Potree2Source';
 import Coordinates from 'Core/Geographic/Coordinates';
 import GlobeView from 'Core/Prefab/GlobeView';
 import View from 'Core/View';
-import HttpsProxyAgent from 'https-proxy-agent';
 import Renderer from './bootstrap';
 
 describe('Potree2 Provider', function () {
@@ -49,7 +48,6 @@ describe('Potree2 Provider', function () {
         let source = new Potree2Source({
             file: 'metadata.json',
             url: 'https://blocinbloc-public-test.s3.fr-par.scw.cloud/lion-potree2',
-            networkOptions: process.env.HTTPS_PROXY ? { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY) } : {},
             metadata,
         });
 
@@ -64,7 +62,6 @@ describe('Potree2 Provider', function () {
         source = new Potree2Source({
             file: 'metadata.json',
             url: 'https://blocinbloc-public-test.s3.fr-par.scw.cloud/lion-potree2',
-            networkOptions: process.env.HTTPS_PROXY ? { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY) } : {},
             metadata: {
                 version: '2.0',
                 name: 'lion',
@@ -131,7 +128,6 @@ describe('Potree2 Provider', function () {
         source = new Potree2Source({
             file: 'metadata.json',
             url: 'https://blocinbloc-public-test.s3.fr-par.scw.cloud/lion-potree2',
-            networkOptions: process.env.HTTPS_PROXY ? { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY) } : {},
             metadata: {
                 version: '2.0',
                 name: 'lion',
@@ -198,7 +194,6 @@ describe('Potree2 Provider', function () {
         source = new Potree2Source({
             file: 'metadata.json',
             url: 'https://blocinbloc-public-test.s3.fr-par.scw.cloud/lion-potree2',
-            networkOptions: process.env.HTTPS_PROXY ? { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY) } : {},
             metadata: {
                 version: '2.0',
                 name: 'lion',

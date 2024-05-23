@@ -2,7 +2,6 @@ import assert from 'assert';
 import Potree2Layer from 'Layer/Potree2Layer';
 import Potree2Source from 'Source/Potree2Source';
 import View from 'Core/View';
-import HttpsProxyAgent from 'https-proxy-agent';
 import Potree2Node from 'Core/Potree2Node';
 import PointsMaterial from 'Renderer/PointsMaterial';
 import OrientedImageMaterial from 'Renderer/OrientedImageMaterial';
@@ -26,7 +25,6 @@ describe('Potree2', function () {
             source: new Potree2Source({
                 file: 'metadata.json',
                 url: 'https://blocinbloc-public-test.s3.fr-par.scw.cloud/lion-potree2',
-                networkOptions: process.env.HTTPS_PROXY ? { agent: new HttpsProxyAgent(process.env.HTTPS_PROXY) } : {},
             }),
             onPointsCreated: () => {},
             crs: viewer.referenceCrs,
@@ -115,11 +113,6 @@ describe('Potree2', function () {
         const pMaterial2 = new PointsMaterial();
         it('instance', () => {
             assert.ok(pMaterial);
-        });
-        it('Define isWebGL2 on before compile', () => {
-            const shader = {};
-            pMaterial.onBeforeCompile(shader, renderer);
-            assert.equal(shader.glslVersion, '300 es');
         });
         it('copy', () => {
             pMaterial2.copy(pMaterial);

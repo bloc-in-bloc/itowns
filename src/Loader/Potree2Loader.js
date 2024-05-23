@@ -48,8 +48,8 @@ const typedArrayMapping = {
     double: Float64Array,
 };
 
-onmessage = function processMessage(event) {
-    const { buffer, pointAttributes, scale, min, size, offset, numPoints } = event.data;
+export default function load(buffer, options) {
+    const { pointAttributes, scale, min, size, offset, numPoints } = options;
 
     const view = new DataView(buffer);
 
@@ -217,17 +217,9 @@ onmessage = function processMessage(event) {
         }
     }
 
-    const message = {
+    return {
         buffer,
         attributeBuffers,
         density: occupancy,
     };
-
-    const transferables = [];
-    Object.keys(message.attributeBuffers).forEach((property) => {
-        transferables.push(message.attributeBuffers[property].buffer);
-    });
-    transferables.push(buffer);
-
-    postMessage(message, transferables);
-};
+}
