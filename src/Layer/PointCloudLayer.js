@@ -246,6 +246,9 @@ class PointCloudLayer extends GeometryLayer {
 
         // pick the best bounding box
         const bbox = (elt.tightbbox ? elt.tightbbox : elt.bbox);
+        if (!bbox) {
+            return;
+        }
         elt.visible = context.camera.isBox3Visible(bbox, this.object3d.matrixWorld);
         if (!elt.visible) {
             markForDeletion(elt);
