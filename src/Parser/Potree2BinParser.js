@@ -4,7 +4,7 @@ import { spawn, Pool, Transfer } from 'threads';
 let _pool;
 function getPool() {
     const initWorker = () => new Worker(
-        new URL('../Worker/Potree2Worker.js', import.meta.url),
+        /* webpackChunkName: "Potree2Worker" */ new URL('../Worker/Potree2Worker.js', import.meta.url),
     );
     _pool = Pool(async () => spawn(initWorker()), {
         size: 1,
