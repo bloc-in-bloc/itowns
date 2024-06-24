@@ -13,14 +13,12 @@ module.exports = {
     },
     settings: {
         'import/resolver': {
-            webpack: {
-                config: './webpack.config.cjs',
-            },
+            'babel-module': {},
         },
     },
     env: {
         browser: true,
-        es6: true,
+        es2020: true,
         amd: true,
         commonjs: true,
     },
