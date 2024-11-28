@@ -32,6 +32,9 @@
         <script type="importmap">
             {
                 "imports": {
+                    "web-ifc": "https://cdn.jsdelivr.net/npm/web-ifc@0.0.66/web-ifc-api.js",
+                    "@thatopen/fragments": "https://unpkg.com/@thatopen/fragments@2.4.0/dist/index.mjs",
+                    "@thatopen/components": "https://unpkg.com/@thatopen/components@2.4.2/dist/index.mjs",
                     "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
                     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
                 }
@@ -41,6 +44,7 @@
         <script type="module">
             const THREE = itowns.THREE;
             import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+            import * as OBC from '@thatopen/components';
 
             var potreeLayer;
             var viewerDiv;
@@ -56,6 +60,7 @@
             var raycaster = new THREE.Raycaster();
             var ifcModel;
             var dwgModel;
+            var fragments;
 
             CameraControls.install( { THREE: THREE } );
 
@@ -205,20 +210,92 @@
                 debugMenu = new GuiTools('menuDiv', view);
 
                 Promise.all([
-                    loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/orvault_batiment.glb', 1351152.118201931, 6240395.0059363097, 61.329999999999998),
-                    loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/02_ep.glb', 1351179.6215255815, 6240386.4719831934, 51.503709487999998),
+                    // loadIfc("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/04_surface_projet.ifc", 1351158.4424398527, 6240357.6495920252, 53.888999999999996),
+                    loadIfc("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/01_batiment_v_6.ifc", 1351152.118201931, 6240395.0059363097, 61.329999999999998),
+                    loadIfc("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/04_surface_projet.ifc", 1351158.4424398527, 6240357.6495920252, 53.888999999999996),
+                    // loadIfc("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/01_batiment_v_6.ifc", 1351152.118201931, 6240395.0059363097, 61.329999999999998),
+                    // loadIfcFrag("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/04_surface_projet.frag", 1351158.4424398527, 6240357.6495920252, 53.888999999999996),
+                    // loadIfcFrag("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/01_batiment_v_6.frag", 1351152.118201931, 6240395.0059363097, 61.329999999999998),
+                    // loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/orvault_batiment.glb', 1351152.118201931, 6240395.0059363097, 61.329999999999998),
+                    // loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/02_ep.glb', 1351179.6215255815, 6240386.4719831934, 51.503709487999998),
                     loadElevation(),
                     loadOrtho(),
-                    loadPointCloud(),
-                    loadGeoJson(),
-                    loadGeoTiff(),
+                    // loadPointCloud(),
+                    // loadGeoJson(),
+                    // loadGeoTiff(),
                     // load3DTilesBuildings(),
-                    loadBuildings(),
-                    loadDWG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/DWG_GLB/bloc.glb", 1351130.3349769686, 6240354.932333742, 53.218872),
-                    loadCadastre(),
-                    loadCadastreWFS()
+                    // loadBuildings(),
+                    // loadDWG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/DWG_GLB/bloc.glb", 1351130.3349769686, 6240354.932333742, 53.218872),
+                    // loadCadastre(),
+                    // loadCadastreWFS()
                 ])
                     .then(onAllLoaded);
+            }
+
+            async function loadIfc(ifcUrl, longitude, latitude, hauteur) {
+                const components = new OBC.Components();
+                components.init();
+                fragments = components.get(OBC.FragmentsManager);
+                const fragmentIfcLoader = components.get(OBC.IfcLoader);
+                await fragmentIfcLoader.setup();
+
+                const ifcFile = await fetch(ifcUrl);
+                const data = await ifcFile.arrayBuffer();
+                const buffer = new Uint8Array(data);
+                const model = await fragmentIfcLoader.load(buffer);
+
+                // update coordinate of the mesh
+                model.updateMatrixWorld();
+
+                model.position.x = 0;
+                model.position.y = 0;
+                model.position.z = 0;
+
+                const boundingBox = new THREE.Box3().setFromObject(model);
+                const center = new THREE.Vector3();
+                boundingBox.getCenter(center);
+
+                model.position.x = -(centerCoord.x - longitude) - center.x;
+                model.position.y = -(centerCoord.z - hauteur) - center.y;
+                model.position.z = centerCoord.y - latitude - center.z;
+
+                scene.add(model);
+
+                const boundingSphere = new THREE.Box3().setFromObject(model).getBoundingSphere(new THREE.Sphere());
+                controls.fitToSphere(boundingSphere, false);
+            }
+
+            async function loadIfcFrag(ifcUrl, longitude, latitude, hauteur) {
+                const components = new OBC.Components();
+                components.init();
+                fragments = components.get(OBC.FragmentsManager);
+                // fragmentIfcLoader = components.get(OBC.IfcLoader);
+                // await fragmentIfcLoader.setup();
+
+                const ifcFile = await fetch(ifcUrl);
+                const data = await ifcFile.arrayBuffer();
+                const buffer = new Uint8Array(data);
+                const model = await fragments.load(buffer);
+
+                // update coordinate of the mesh
+                model.updateMatrixWorld();
+
+                model.position.x = 0;
+                model.position.y = 0;
+                model.position.z = 0;
+
+                const boundingBox = new THREE.Box3().setFromObject(model);
+                const center = new THREE.Vector3();
+                boundingBox.getCenter(center);
+
+                model.position.x = -(centerCoord.x - longitude) - center.x;
+                model.position.y = -(centerCoord.z - hauteur) - center.y;
+                model.position.z = centerCoord.y - latitude - center.z;
+
+                scene.add(model);
+
+                const boundingSphere = new THREE.Box3().setFromObject(model).getBoundingSphere(new THREE.Sphere());
+                controls.fitToSphere(boundingSphere, false);
             }
 
             function loadGlbFile(url, longitude, latitude, hauteur) {
@@ -633,6 +710,18 @@
                     loadView();
                 };
 
+                debugMenu.exportFragment = function() {
+                    console.log("Export ifc to frag");
+                    const group = Array.from(fragments.groups.values())[0];
+                    const data = fragments.export(group);
+                    download(new File([new Blob([data])], "file.frag"));
+
+                    const properties = group.getLocalProperties();
+                    if (properties) {
+                        download(new File([JSON.stringify(properties)], "file.json"));
+                    }
+                };
+
                 debugMenu.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
                 debugMenu.gui.add(settings, 'omniscaleKey').name('Omniscale key');
                 debugMenu.gui.add(debugMenu, 'resize').name('Resize view extent');
@@ -640,6 +729,7 @@
                 debugMenu.gui.add(settings, 'dwgVisibility').name('DWG visibility').onChange(updateDWGVisibility);
                 debugMenu.gui.add(settings, 'showWFSProperties').name('Show properties');
                 debugMenu.gui.add(settings, 'urbsKey').name('URBS key');
+                debugMenu.gui.add(debugMenu, 'exportFragment').name('Export ifc to frag');
 
                 if (potreeLayer != null) {
                     // update stats window
@@ -771,6 +861,15 @@
                                 });
                         }
                     });
+            }
+
+            function download(file) {
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(file);
+                link.download = file.name;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
             }
         </script>
     </body>

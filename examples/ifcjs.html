@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Demo PlanarView</title>
+
+        <style type="text/css">
+            #info {
+                color: #7ad7ff;
+                font-family: 'Open Sans', sans-serif;
+                position: absolute;
+                top: 0;
+                left: 0;
+                padding: 0.3rem;
+                background-color: #404040;
+                z-index: 1;
+            }
+
+            @media (max-width: 600px) {
+                #info,
+                .dg {
+                    display: none;
+                }
+            }
+        </style>
+
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+        <div id="info"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+        <script src="../dist/itowns.js"></script>
+        <script src="js/GUI/LoadingScreen.js"></script>
+        <script src="../dist/debug.js"></script>
+        <script src="js/GUI/GuiTools.js"></script>
+        <script src="https://unpkg.com/camera-controls@2.7.2/dist/camera-controls.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+        <script src="js/plugins/COGParser.js"></script>
+        <script src="js/plugins/COGSource.js"></script>
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/",
+                    "@thatopen/components": "https://cdn.jsdelivr.net/npm/@thatopen/components@2.4.2/+esm"
+                }
+            }
+        </script>
+
+        <script type="module">
+            import * as OBC from "@thatopen/components";
+
+            const container = document.getElementById("viewerDiv");
+
+            const components = new OBC.Components();
+
+            const worlds = components.get(OBC.Worlds);
+            const world = worlds.create();
+
+            world.scene = new OBC.SimpleScene(components);
+            world.renderer = new OBC.SimpleRenderer(components, container);
+            world.camera = new OBC.SimpleCamera(components);
+
+            components.init();
+
+            world.camera.controls.setLookAt(12, 6, 8, 0, 0, -10);
+
+            world.scene.setup();
+
+            const grids = components.get(OBC.Grids);
+            grids.create(world);
+
+            loadIfcGeometryTiler();
+
+            async function loadIfcGeometryTiler() {
+                const fragmentIfcLoader = components.get(OBC.IfcLoader);
+                await fragmentIfcLoader.setup();
+                const ifcFile = await fetch("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/04_surface_projet.ifc");
+                const data = await ifcFile.arrayBuffer();
+                const buffer = new Uint8Array(data);
+                const model = await fragmentIfcLoader.load(buffer);
+                model.name = "batiment";
+
+                world.scene.three.add(model);
+
+                console.log("YEAH !");
+            }
+
+            /*
+            async function loadIfcFragFile(){
+                const components = new OBC.Components();
+                components.init();
+                const fragments = components.get(OBC.FragmentsManager);
+                const fragmentIfcLoader = components.get(OBC.IfcLoader);
+
+                const file = await fetch("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/01_batiment_v_6.frag",);
+                const data = await file.arrayBuffer();
+                const buffer = new Uint8Array(data);
+                const group = fragments.load(buffer);
+
+                world.scene.three.add(group);
+
+                console.log("IIC ??");
+            }*/
+        </script>
+    </body>
+</html>
+

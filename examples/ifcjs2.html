@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Demo PlanarView</title>
+
+        <style type="text/css">
+            #info {
+                color: #7ad7ff;
+                font-family: 'Open Sans', sans-serif;
+                position: absolute;
+                top: 0;
+                left: 0;
+                padding: 0.3rem;
+                background-color: #404040;
+                z-index: 1;
+            }
+
+            @media (max-width: 600px) {
+                #info,
+                .dg {
+                    display: none;
+                }
+            }
+        </style>
+
+        <meta charset="UTF-8">
+        <link rel="stylesheet" type="text/css" href="css/example.css">
+        <link rel="stylesheet" type="text/css" href="css/LoadingScreen.css">
+
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body>
+        <div id="viewerDiv"></div>
+        <div id="info"></div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+        <script src="../dist/itowns.js"></script>
+        <script src="js/GUI/LoadingScreen.js"></script>
+        <script src="../dist/debug.js"></script>
+        <script src="js/GUI/GuiTools.js"></script>
+        <script src="https://unpkg.com/camera-controls@2.7.2/dist/camera-controls.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+        <script src="js/plugins/COGParser.js"></script>
+        <script src="js/plugins/COGSource.js"></script>
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "web-ifc": "https://cdn.jsdelivr.net/npm/web-ifc@0.0.66/web-ifc-api.js",
+                    "@thatopen/fragments": "https://unpkg.com/@thatopen/fragments@2.4.0/dist/index.mjs",
+                    "@thatopen/components": "https://unpkg.com/@thatopen/components@2.4.2/dist/index.mjs",
+                    "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+                }
+            }
+        </script>
+
+        <script type="module">
+            import * as THREE from 'three';
+            import * as OBC from '@thatopen/components';
+
+            const container = document.getElementById("viewerDiv");
+
+            const components = new OBC.Components();
+
+            const renderer = new THREE.WebGLRenderer({
+                alpha: true,
+                antialias: true,
+                powerPreference: "high-performance",
+                preserveDrawingBuffer: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight );
+            container.appendChild(renderer.domElement);
+
+            var scene = new THREE.Scene();
+            var rendererSize = renderer.getSize(new THREE.Vector2());
+            var camera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 0.1, 1000);
+
+            loadIfcGeometryTiler();
+
+            async function loadIfcGeometryTiler() {
+                const fragmentIfcLoader = components.get(OBC.IfcLoader);
+                await fragmentIfcLoader.setup();
+                const ifcFile = await fetch("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/04_surface_projet.ifc");
+                const data = await ifcFile.arrayBuffer();
+                const buffer = new Uint8Array(data);
+                const model = await fragmentIfcLoader.load(buffer);
+                model.name = "batiment";
+                console.log(model);
+
+                scene.add(model);
+
+                console.log("YEAH !");
+            }
+
+            animate();
+
+            function animate() {
+                renderer.render( scene, camera );
+                requestAnimationFrame( animate );
+            }
+
+            /*
+            async function loadIfcFragFile(){
+                const components = new OBC.Components();
+                components.init();
+                const fragments = components.get(OBC.FragmentsManager);
+                const fragmentIfcLoader = components.get(OBC.IfcLoader);
+
+                const file = await fetch("https://blocinbloc-public-test.s3.fr-par.scw.cloud/ifc/01_batiment_v_6.frag",);
+                const data = await file.arrayBuffer();
+                const buffer = new Uint8Array(data);
+                const group = fragments.load(buffer);
+
+                world.scene.three.add(group);
+
+                console.log("IIC ??");
+            }*/
+        </script>
+    </body>
+</html>
+
