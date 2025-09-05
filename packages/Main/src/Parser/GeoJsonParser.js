@@ -99,7 +99,7 @@ const toFeature = {
 };
 
 function coordinatesToFeature(type, feature, crsIn, coordinates, collection, properties) {
-    if (coordinates.length == 0) {
+    if (coordinates === undefined || coordinates === null || coordinates.length == 0) {
         return;
     }
     switch (type) {
@@ -139,7 +139,7 @@ function toFeatureType(jsonType) {
 
 const keyProperties = ['type', 'geometry', 'properties'];
 
-const firstCoordinates = a => (a === undefined || (Array.isArray(a) && !isNaN(a[0])) ? a : firstCoordinates(a[0]));
+const firstCoordinates = a => (a === undefined || a === null || (Array.isArray(a) && !isNaN(a[0])) ? a : firstCoordinates(a[0]));
 
 function jsonFeatureToFeature(crsIn, json, collection) {
     if (!json.geometry?.type) {

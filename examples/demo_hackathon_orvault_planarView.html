@@ -21,33 +21,46 @@
         <ul id="urbsInfo"></ul>
     </div>
     <div id="viewerDiv"></div>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
+    <script src="../dist/itowns.js"></script>
+    <script src="js/GUI/CustomLoadingScreen.js"></script>
+    <script src="../dist/debug.js"></script>
+    <script src="js/GUI/GuiTools.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
+    <script src="js/plugins/COGParser.js"></script>
+    <script src="js/plugins/COGSource.js"></script>
 
     <script type="importmap">
-            {
-                "imports": {
-                    "itowns": "../dist/itowns.js",
-                    "debug": "../dist/debug.js",
-                    "dat": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js",
-                    "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
-                    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/",
-                    "camera-controls": "https://unpkg.com/camera-controls@2.7.2/dist/camera-controls.module.js",
-                    "lil": "https://unpkg.com/lil-gui@0.20.0/dist/lil-gui.esm.js"
-                }
-            }
-    </script>
+             {
+                 "imports": {
+                     "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+                     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+                     "camera-controls": "https://unpkg.com/camera-controls@2.10.0/dist/camera-controls.module.js",
+                     "three-geojson": "../../three-geojson/src/index.js",
+                     "three-geojson/constructLineObject": "../../three-geojson/src/constructLineObject.js",
+                     "@turf/area": "https://unpkg.com/@turf/area@7.2.0/dist/esm/index.js",
+                     "@turf/boolean-point-in-polygon": "https://unpkg.com/@turf/boolean-point-in-polygon/dist/esm/index.js",
+                     "@turf/meta": "https://unpkg.com/@turf/meta@7.2.0/dist/esm/index.js",
+                     "@turf/invariant": "https://unpkg.com/@turf/invariant@7.2.0/dist/esm/index.js",
+                     "@turf/helpers": "https://unpkg.com/@turf/helpers@7.2.0/dist/esm/index.js",
+                     "@turf/unkink-polygon": "https://unpkg.com/@turf/unkink-polygon@7.2.0/dist/esm/index.js",
+                     "rbush": "https://unpkg.com/rbush@4.0.1/index.js",
+                     "quickselect": "https://unpkg.com/quickselect@3.0.0/index.js",
+                     "point-in-polygon-hao": "https://unpkg.com/point-in-polygon-hao@1.2.4/dist/esm/index.js",
+                     "robust-predicates": "https://unpkg.com/robust-predicates@3.0.2/index.js",
+                     "delaunator": "https://unpkg.com/delaunator@5.0.1/index.js",
+                     "@kninnug/constrainautor": "https://unpkg.com/@kninnug/constrainautor@4.0.1/lib/Constrainautor.mjs",
+                     "betterknown": "https://unpkg.com/betterknown@1.0.5/dist/betterknown.mjs"
+                 }
+             }
+         </script>
 
     <script type="module">
+        const THREE = itowns.THREE;
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
-        import * as THREE from 'three';
-        import * as itowns from 'itowns';
         import CameraControls from 'camera-controls';
-        import { setupLoadingScreen, hideLoader } from "./jsm/GUI/CustomLoadingScreen.js";
-        import GuiTools from "./jsm/GUI/GuiTools.js";
-        import COGSource from "./jsm/plugins/COGSource.js";
-        import * as debug from 'debug';
-        import lil from 'lil';
+        import { GeoJSONLoader, } from 'three-geojson';
+        import { constructLineObject } from 'three-geojson/constructLineObject';
 
         var potreeLayer;
         var viewerDiv;
@@ -69,7 +82,7 @@
         viewerDiv = document.getElementById('viewerDiv');
         viewerDiv.style.display = 'block';
 
-        debugGui = new lil();
+        debugGui = new dat.GUI();
 
         const IMAGE_SOURCE_TYPE = {
             SATELLITE: 0,
@@ -87,21 +100,33 @@
         }
 
         // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
-        itowns.CRS.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
-        itowns.CRS.defs('EPSG:4978', '+proj=geocent +datum=WGS84 +ellps=GRS80 +units=m +vunits=m +no_defs +type=crs');
-        itowns.CRS.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
-        itowns.CRS.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+        itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+        itowns.proj4.defs('EPSG:4978', '+proj=geocent +datum=WGS84 +ellps=GRS80 +units=m +vunits=m +no_defs +type=crs');
+        itowns.proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
+        itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+        itowns.proj4.defs("EPSG:3949","+proj=lcc +lat_0=49 +lon_0=3 +lat_1=48.25 +lat_2=49.75 +x_0=1700000 +y_0=8200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs");
+        itowns.proj4.defs("EPSG:3950","+proj=lcc +lat_0=50 +lon_0=3 +lat_1=49.25 +lat_2=50.75 +x_0=1700000 +y_0=9200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs");
 
         let extentSize = 400;
-        const viewExtentEPSG = "EPSG:3947";
-        const orthoEPSG = viewExtentEPSG; // "EPSG:3947";
-        const centerCoord = new itowns.Coordinates(viewExtentEPSG, 1351152.118201931, 6240395.0059363097, 61.329999999999998);
 
+        /*
+        // Orvault
+        const viewExtentEPSG = "EPSG:3947";
+        const centerCoord = new itowns.Coordinates(viewExtentEPSG, 1351125.471158533, 6240310.315943388, 61.329999999999998);
+         */
+
+        // leonard test geojson
+        const viewExtentEPSG = "EPSG:2154";
+        const centerCoord = new itowns.Coordinates(viewExtentEPSG, 828596.6955, 6309714.945, 61.329999999999998);
+
+        const orthoEPSG = viewExtentEPSG; // "EPSG:3947";
+        var backgroundColor = new THREE.Color(0x827d8a);
         var customRenderer = createRenderer();
         var rendererSize = customRenderer.getSize(new THREE.Vector2());
         var customCamera = new THREE.PerspectiveCamera(60, rendererSize.width / rendererSize.height, 0.1, 1000);
         customCamera.up.set(0, 1, 0);
         scene.add(customCamera);
+        scene.backgroundColor = backgroundColor;
 
         let layerOrtho;
         let layerDEM;
@@ -117,8 +142,7 @@
         loadView();
 
         view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.BEFORE_RENDER, () => {
-            customRenderer.setClearColor(0x000000, 0);
-            customCamera.layers.set(1);
+            customRenderer.setClearColor(backgroundColor);
             view.tileLayer.level0Nodes[0].traverse((node) => {
                 if (!node.alreadyDone) {
                     node.alreadyDone = true;
@@ -131,7 +155,7 @@
             customCamera.layers.set(0);
             customRenderer.clearDepth();
             customRenderer.render(scene, customCamera);
-            customCamera.layers.enableAll();
+            customCamera.layers.set(1);
         });
 
         controls = new CameraControls(customCamera, viewerDiv);
@@ -172,9 +196,12 @@
             renderer.setPixelRatio(window.devicePixelRatio);
             renderer.info.autoReset = false;
 
+            renderer.autoClearColor = false;
+            renderer.autoClear = false;
+
             // Improve color rendering
             renderer.localClippingEnabled = true;
-            renderer.setClearColor(0x000000, 0);
+            renderer.setClearColor(backgroundColor, 0);
 
             // Increase start-up time to render
             const pmremGenerator = new THREE.PMREMGenerator(renderer);
@@ -226,6 +253,7 @@
 
             view.tileLayer.disableSkirt = true;
             view.tileLayer.opacity = settings.opacity;
+            view.tileLayer.visible = true;
 
             customRenderer.setClearColor(0x000000, 0);
             setupLoadingScreen(viewerDiv, view);
@@ -233,18 +261,19 @@
             debugMenu = new GuiTools('menuDiv', view);
 
             Promise.all([
-                loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/orvault_batiment.glb', 1351152.118201931, 6240395.0059363097, 61.329999999999998),
-                loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/02_ep.glb', 1351179.6215255815, 6240386.4719831934, 51.503709487999998),
-                loadElevation(),
-                loadOrtho(),
-                loadPointCloud(),
-                loadGeoJson(),
-                loadGeoTiff(),
+                // loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/orvault_batiment.glb', 1351152.118201931, 6240395.0059363097, 61.329999999999998),
+                // loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/02_ep.glb', 1351179.6215255815, 6240386.4719831934, 51.503709487999998),
+                // loadElevation(),
+                // loadOrtho(),
+                // loadPointCloud(),
+                loadGeoJson2(),
+                // loadGeoJson()
+                // loadGeoTiff(),
                 // load3DTilesBuildings(),
-                loadBuildings(),
-                loadDWG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/DWG_GLB/bloc.glb", 1351130.3349769686, 6240354.932333742, 53.218872),
-                loadCadastre(),
-                loadCadastreWFS()
+                // loadBuildings(),
+                // loadDWG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/DWG_GLB/bloc.glb", 1351130.3349769686, 6240354.932333742, 53.218872),
+                // loadCadastre(),
+                // loadCadastreWFS()
             ])
                 .then(onAllLoaded);
         }
@@ -334,32 +363,71 @@
             });
         }
 
-        async function loadPointCloud() {
+        function loadPointCloud() {
             const pointCloudGroup = new THREE.Group();
             pointCloudGroup.name = "PointCloudGroup";
-
-            const potreeSource = new itowns.Potree2Source({
-                file: 'metadata.json',
-                url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/Orvault-Potree2-brotli-3947',
-                crs: 'EPSG:3947',
-            });
+            view.tileLayer.object3d.add(pointCloudGroup);
 
             // Configure Point Cloud layer
-            potreeLayer = new itowns.Potree2Layer('points_cloud', {
+            potreeLayer = new itowns.Potree2Layer('Points cloud', {
                 object3d: pointCloudGroup,
-                source: potreeSource
+                source: new itowns.Potree2Source({
+                    file: 'metadata.json',
+                    url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/Orvault-Potree2-brotli-3947',
+                    crs: 'EPSG:3947',
+                }),
             });
 
-            await potreeSource.whenReady;
-            view.tileLayer.object3d.add(pointCloudGroup);
-            await itowns.View.prototype.addLayer.call(view, potreeLayer);
-            return potreeLayer;
+            return itowns.View.prototype.addLayer.call(view, potreeLayer);
+        }
+
+        function loadGeoJson2() {
+            new GeoJSONLoader()
+                .loadAsync(`https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/projet_en_cours_l_g_2154.geojson`)
+                // .loadAsync(`https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/orvault.geojson`)
+                // .loadAsync('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/geojsons/plan_G2C.geojson')
+                // .loadAsync('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/geojsons/mesnil2_extrait.geojson')
+                .then(res => {
+                    const group = new THREE.Group();
+                    // group.rotateY(90 * THREE.MathUtils.DEG2RAD);
+                    group.rotateX(-90 * THREE.MathUtils.DEG2RAD);
+                    group.rotateZ(180 * THREE.MathUtils.DEG2RAD);
+                    scene.add(group);
+
+                    console.log(res);
+
+                    res.lines.forEach(line => {
+                        if (line.foreign.PlanCoordinates !== undefined && line.foreign.PlanCoordinates.length > 0) {
+                            line.data = line.foreign.PlanCoordinates;
+
+                            if (line.data?.[0]?.[0]?.[0] === undefined) {
+                                line.data = [line.data];
+                            }
+                        } else {
+                            line.data = line.data.map(vertices => {
+                                return vertices.map(vertex => {
+                                    return itowns.proj4("EPSG:4326", viewExtentEPSG, [vertex[0], vertex[1]]);
+                                });
+                            });
+                        }
+
+                        line.data = line.data.map(vertices => {
+                            return vertices.map(vertex => {
+                                return [centerCoord.x - vertex[0], centerCoord.y - vertex[1], vertex[2]];
+                            });
+                        });
+
+                        const lineObject = constructLineObject(line.data);
+                        group.add(lineObject);
+                    });
+                });
         }
 
         function loadGeoJson() {
             // Handle fetching step.
             // Should you implement a custom fetcher, it would need to be called here.
-            return itowns.Fetcher.json('https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/orvault.geojson')
+            // return itowns.Fetcher.json('https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/orvault.geojson')
+            return itowns.Fetcher.json('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/projet_en_cours_l_g_2154.geojson')
                 .then((fetched) => {
                     // Handle parsing step.
                     // We parse the fetched data into a FeatureCollection.
@@ -369,7 +437,7 @@
                         // Information on the fetched data.
                         // See http://www.itowns-project.org/itowns/docs/#api/Source/ParsingOptions.
                         in: {
-                            crs: 'EPSG:4326',
+                            crs: 'EPSG:2154',
                         },
                         // Information on the FeatureCollection that should be created from the fetched data. Here, we pass a
                         // FeatureBuildingOptions (http://www.itowns-project.org/itowns/docs/#api/Base/FeatureBuildingOptions).
@@ -602,7 +670,7 @@
             var info;
             var batchId;
 
-            if (intersects.length > 0) {
+            if (intersects.length) {
                 batchId = intersects[0].object.geometry.attributes.batchId.array[intersects[0].face.a];
                 properties = intersects[0].object.feature.geometries[batchId].properties;
                 Object.keys(properties).map(function (objectKey) {
@@ -639,7 +707,7 @@
             viewerDiv.addEventListener("mousedown", (evt) => onMouseDown(evt), true);
 
             if (potreeLayer != null) {
-                debug.PointCloudDebug.initTools(view, potreeLayer, debugGui);
+                // debug.PointCloudDebug.initTools(view, potreeLayer, debugMenu.gui);
             }
 
             var imageryLayers = [];
