@@ -12,6 +12,7 @@ export default {
                 .then((results) => {
                     const anyFulfilledPromise = results.find(promise => promise.status === 'fulfilled');
                     if (!anyFulfilledPromise) {
+                        console.log(results);
                         // All promises failed -> reject
                         return Promise.reject(new Error('Failed to load any data'));
                     }

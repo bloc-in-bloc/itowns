@@ -12,30 +12,18 @@
 </head>
 
 <body>
-    <div id="description">
-        <p><b>Point Cloud information</b></p>
-        <ul id="info"></ul>
-        <p><b>WFS information</b></p>
-        <ul id="infoBuilding"></ul>
-        <p><b>URBS information</b></p>
-        <ul id="urbsInfo"></ul>
-    </div>
     <div id="viewerDiv"></div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.6/dat.gui.min.js"></script>
-    <script src="../dist/itowns.js"></script>
-    <script src="js/GUI/CustomLoadingScreen.js"></script>
-    <script src="../dist/debug.js"></script>
-    <script src="js/GUI/GuiTools.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/geotiff"></script>
-    <script src="js/plugins/COGParser.js"></script>
-    <script src="js/plugins/COGSource.js"></script>
 
     <script type="importmap">
              {
                  "imports": {
+                     "itowns": "../dist/itowns.js",
+                     "debug": "../dist/debug.js",
+                     "dat": "https://unpkg.com/dat.gui@0.7.9/build/dat.gui.module.js",
                      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
                      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
                      "camera-controls": "https://unpkg.com/camera-controls@2.10.0/dist/camera-controls.module.js",
+                     "lil": "https://unpkg.com/lil-gui@0.20.0/dist/lil-gui.esm.js",
                      "three-geojson": "../../three-geojson/src/index.js",
                      "three-geojson/constructLineObject": "../../three-geojson/src/constructLineObject.js",
                      "@turf/area": "https://unpkg.com/@turf/area@7.2.0/dist/esm/index.js",
@@ -56,13 +44,17 @@
          </script>
 
     <script type="module">
-        const THREE = itowns.THREE;
+        import * as THREE from 'three';
+        import * as itowns from 'itowns';
         import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
         import CameraControls from 'camera-controls';
-        import { GeoJSONLoader, } from 'three-geojson';
+        import { setupLoadingScreen, hideLoader } from "./jsm/GUI/CustomLoadingScreen.js";
+        import GuiTools from "./jsm/GUI/GuiTools.js";
+        import lil from 'lil';
+        import { GeoJSONLoader } from 'three-geojson';
         import { constructLineObject } from 'three-geojson/constructLineObject';
+        import {Vector3} from "three";
 
-        var potreeLayer;
         var viewerDiv;
         var debugGui;
         var view;
@@ -75,14 +67,13 @@
         var pivot;
         var raycaster = new THREE.Raycaster();
         var ifcModel;
-        var dwgModel;
 
         CameraControls.install({ THREE: THREE });
 
         viewerDiv = document.getElementById('viewerDiv');
         viewerDiv.style.display = 'block';
 
-        debugGui = new dat.GUI();
+        debugGui = new lil();
 
         const IMAGE_SOURCE_TYPE = {
             SATELLITE: 0,
@@ -100,14 +91,14 @@
         }
 
         // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
-        itowns.proj4.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
-        itowns.proj4.defs('EPSG:4978', '+proj=geocent +datum=WGS84 +ellps=GRS80 +units=m +vunits=m +no_defs +type=crs');
-        itowns.proj4.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
-        itowns.proj4.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
-        itowns.proj4.defs("EPSG:3949","+proj=lcc +lat_0=49 +lon_0=3 +lat_1=48.25 +lat_2=49.75 +x_0=1700000 +y_0=8200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs");
-        itowns.proj4.defs("EPSG:3950","+proj=lcc +lat_0=50 +lon_0=3 +lat_1=49.25 +lat_2=50.75 +x_0=1700000 +y_0=9200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs");
+        itowns.CRS.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+        itowns.CRS.defs('EPSG:4978', '+proj=geocent +datum=WGS84 +ellps=GRS80 +units=m +vunits=m +no_defs +type=crs');
+        itowns.CRS.defs('EPSG:4326', '+proj=longlat +datum=WGS84 +no_defs +type=crs');
+        itowns.CRS.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
+        itowns.CRS.defs("EPSG:3949","+proj=lcc +lat_0=49 +lon_0=3 +lat_1=48.25 +lat_2=49.75 +x_0=1700000 +y_0=8200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs");
+        itowns.CRS.defs("EPSG:3950","+proj=lcc +lat_0=50 +lon_0=3 +lat_1=49.25 +lat_2=50.75 +x_0=1700000 +y_0=9200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs");
 
-        let extentSize = 400;
+        let extentSize = 50;
 
         /*
         // Orvault
@@ -115,9 +106,8 @@
         const centerCoord = new itowns.Coordinates(viewExtentEPSG, 1351125.471158533, 6240310.315943388, 61.329999999999998);
          */
 
-        // leonard test geojson
         const viewExtentEPSG = "EPSG:2154";
-        const centerCoord = new itowns.Coordinates(viewExtentEPSG, 828596.6955, 6309714.945, 61.329999999999998);
+        const centerCoord = new itowns.Coordinates(viewExtentEPSG, 1646348.1956, 8189304.5895, 0);
 
         const orthoEPSG = viewExtentEPSG; // "EPSG:3947";
         var backgroundColor = new THREE.Color(0x827d8a);
@@ -261,140 +251,29 @@
             debugMenu = new GuiTools('menuDiv', view);
 
             Promise.all([
-                // loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/orvault_batiment.glb', 1351152.118201931, 6240395.0059363097, 61.329999999999998),
-                // loadGlbFile('https://blocinbloc-public-test.s3.fr-par.scw.cloud/projet_orvault_glb/02_ep.glb', 1351179.6215255815, 6240386.4719831934, 51.503709487999998),
-                // loadElevation(),
-                // loadOrtho(),
-                // loadPointCloud(),
-                loadGeoJson2(),
+                loadGeoJson2()
                 // loadGeoJson()
-                // loadGeoTiff(),
-                // load3DTilesBuildings(),
-                // loadBuildings(),
-                // loadDWG("https://blocinbloc-public-test.s3.fr-par.scw.cloud/DWG_GLB/bloc.glb", 1351130.3349769686, 6240354.932333742, 53.218872),
-                // loadCadastre(),
-                // loadCadastreWFS()
             ])
                 .then(onAllLoaded);
         }
 
-        function loadGlbFile(url, longitude, latitude, hauteur) {
-            return new Promise((resolve) => {
-                gltfLoader.load(url,
-                    (glb) => {
-                        const model = glb.scene;
-                        model.name = 'model'
-
-                        // update coordinate of the mesh
-                        model.updateMatrixWorld();
-
-                        model.position.x = -(centerCoord.x - longitude);
-                        model.position.y = -(centerCoord.z - hauteur);
-                        model.position.z = centerCoord.y - latitude;
-
-                        scene.add(model);
-                        ifcModel = model;
-                        view.notifyChange();
-
-                        resolve();
-                    });
-            });
-        }
-
-        function loadElevation() {
-            // Define the source of the dem data
-            const sourceDEM = new itowns.WMSSource({
-                url: "https://data.geopf.fr/wms-r/wms?",
-                name: "ELEVATION.ELEVATIONGRIDCOVERAGE.HIGHRES",
-                format: "image/x-bil;bits=32",
-                crs: 'EPSG:2154',
-                extent: viewExtent,
-            });
-            // Create the dem ElevationLayer and add it to the view
-            layerDEM = new itowns.ElevationLayer('Elevation', { source: sourceDEM });
-            return view.addLayer(layerDEM);
-        }
-
-        function loadOrtho() {
-            let sourceMap = null;
-            switch (settings.imageSourceType) {
-                case IMAGE_SOURCE_TYPE.SATELLITE:
-                    sourceMap = new itowns.WMSSource({
-                        url: "https://data.geopf.fr/wms-r/wms?",
-                        name: "HR.ORTHOIMAGERY.ORTHOPHOTOS",
-                        format: "image/png",
-                        crs: orthoEPSG,
-                        extent: viewExtent
-                    });
-                    break;
-                case IMAGE_SOURCE_TYPE.IGN_PLANV2:
-                    sourceMap = new itowns.WMSSource({
-                        url: "https://data.geopf.fr/wms-r/wms?",
-                        name: "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2",
-                        format: "image/jpeg",
-                        crs: orthoEPSG,
-                        extent: viewExtent
-                    });
-                    break;
-                case IMAGE_SOURCE_TYPE.OMNISCALE_OPEN_STREET_MAP:
-                    sourceMap = new itowns.WMSSource({
-                        url: `https://maps.omniscale.net/v2/${settings.omniscaleKey}/style.default/map`,
-                        name: "osm",
-                        format: "image/png",
-                        crs: orthoEPSG,
-                        extent: viewExtent,
-                        version: '1.1.0',
-                        bboxUrlPrecision: 9
-                    });
-                    break;
-            }
-
-            if (sourceMap == null) {
-                console.error("Source is null !");
-                return;
-            }
-
-            // Create the ortho-images ColorLayer and add it to the view
-            layerOrtho = new itowns.ColorLayer('Fond de carte', { source: sourceMap });
-            return view.addLayer(layerOrtho).then(() => {
-                if (layerGeoTiff != undefined) {
-                    itowns.ColorLayersOrdering.moveLayerUp(view, 'GeoTiff');
-                }
-            });
-        }
-
-        function loadPointCloud() {
-            const pointCloudGroup = new THREE.Group();
-            pointCloudGroup.name = "PointCloudGroup";
-            view.tileLayer.object3d.add(pointCloudGroup);
-
-            // Configure Point Cloud layer
-            potreeLayer = new itowns.Potree2Layer('Points cloud', {
-                object3d: pointCloudGroup,
-                source: new itowns.Potree2Source({
-                    file: 'metadata.json',
-                    url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/Orvault-Potree2-brotli-3947',
-                    crs: 'EPSG:3947',
-                }),
-            });
-
-            return itowns.View.prototype.addLayer.call(view, potreeLayer);
-        }
-
         function loadGeoJson2() {
-            new GeoJSONLoader()
-                .loadAsync(`https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/projet_en_cours_l_g_2154.geojson`)
+            return new GeoJSONLoader()
+                .loadAsync('http://127.0.0.1:8081/Plan_G2C_1.geojson')
+                // .loadAsync(`https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/projet_en_cours_l_g_2154.geojson`)
                 // .loadAsync(`https://cdn.jsdelivr.net/gh/bloc-in-bloc/sample-datas/orvault.geojson`)
                 // .loadAsync('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/geojsons/plan_G2C.geojson')
                 // .loadAsync('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/geojsons/mesnil2_extrait.geojson')
                 .then(res => {
                     const group = new THREE.Group();
+                    group.name = "GeoJson";
                     // group.rotateY(90 * THREE.MathUtils.DEG2RAD);
                     group.rotateX(-90 * THREE.MathUtils.DEG2RAD);
                     group.rotateZ(180 * THREE.MathUtils.DEG2RAD);
                     scene.add(group);
 
-                    console.log(res);
+                    const sphereGeometry = new THREE.SphereGeometry(0.05, 16, 16);
+                    const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
 
                     res.lines.forEach(line => {
                         if (line.foreign.PlanCoordinates !== undefined && line.foreign.PlanCoordinates.length > 0) {
@@ -404,21 +283,63 @@
                                 line.data = [line.data];
                             }
                         } else {
+                            if (line.data !== null) {
+                                line.data = line.data.map(vertices => {
+                                    return vertices.map(vertex => {
+                                        return itowns.proj4("EPSG:4326", viewExtentEPSG, [vertex[0], vertex[1]]);
+                                    });
+                                });
+                            }
+                        }
+
+                        if (line.data !== null) {
                             line.data = line.data.map(vertices => {
-                                return vertices.map(vertex => {
-                                    return itowns.proj4("EPSG:4326", viewExtentEPSG, [vertex[0], vertex[1]]);
+                                return vertices.filter(vertex => vertex !== null).map(vertex => {
+                                    return [centerCoord.x - vertex[0], centerCoord.y - vertex[1], vertex[2]];
                                 });
                             });
                         }
 
-                        line.data = line.data.map(vertices => {
-                            return vertices.map(vertex => {
-                                return [centerCoord.x - vertex[0], centerCoord.y - vertex[1], vertex[2]];
-                            });
-                        });
+                        console.log(line);
 
-                        const lineObject = constructLineObject(line.data);
-                        group.add(lineObject);
+                        if (line.data !== null && line.data.length > 0) {
+                            const lineObject = constructLineObject(line.data);
+                            group.add(lineObject);
+
+                            /*
+                            const positions = lineObject.geometry.attributes.position.array;
+                            for (let i = 0; i < positions.length; i += 3) {
+                                const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+                                const position = new Vector3(positions[i], positions[i + 1], positions[i + 2]);
+                                lineObject.updateMatrixWorld(true);
+                                position.applyMatrix4(lineObject.matrixWorld);
+                                sphere.position.set(position.x, position.y, position.z);
+                                group.add(sphere);
+                                // scene.add(sphere);
+                            }
+                            */
+                        }
+                    });
+
+                    const boxGeometry = new THREE.BoxGeometry( 1, 1, 1 );
+                    const boxMaterial = new THREE.MeshBasicMaterial( {color: 0x00ff00, wireframe: true} );
+
+                    res.features.forEach((feature) => {
+                        const properties = feature.properties;
+                        if ((properties !== undefined) && (properties.Type === "BlockReference") && (properties.BlockName !== "TEXTE")) {
+                            const box = new THREE.Mesh( boxGeometry, boxMaterial );
+
+                            const position = new THREE.Vector3(centerCoord.x - properties.BlockOffset_coordPlanDeg[0], centerCoord.y - properties.BlockOffset_coordPlanDeg[1], properties.BlockOffset_coordPlanDeg[2]);
+                            box.position.copy(position);
+
+                            const scale = new THREE.Vector3(properties.BlockScale[0], properties.BlockScale[1], properties.BlockScale[2]);
+                            box.scale.copy(scale);
+
+                            const angle = properties.BlockAngle;
+                            box.rotateZ(THREE.MathUtils.degToRad(angle));
+
+                            group.add(box);
+                        }
                     });
                 });
         }
@@ -461,153 +382,40 @@
                 });
         }
 
-        function loadGeoTiff() {
-            const sourceTiff = new COGSource({
-                url: "https://blocinbloc-public-test.s3.fr-par.scw.cloud/Enedis4.tif",
-                name: "Enedis",
-                crs: 'EPSG:3947',
-                extent: viewExtent
-            });
+        /*
+        function loadCloud2MapGeoJSON() {
+            return new GeoJSONLoader()
+                .loadAsync('http://127.0.0.1:8081/Plan_G2C_1.geojson')
+                .then(res => {
 
-            layerGeoTiff = new itowns.ColorLayer('GeoTiff', {
-                source: sourceTiff
-            });
+                    const boxGeometry = new THREE.BoxGeometry( 1, 1, 1 );
+                    const boxMaterial = new THREE.MeshBasicMaterial( {color: 0x00ff00, wireframe: true} );
 
-            return view.addLayer(layerGeoTiff).then(() => {
-                itowns.ColorLayersOrdering.moveLayerUp(view, 'GeoTiff');
-            });
-        }
+                    res.features.forEach((feature) => {
+                        const properties = feature.properties;
+                        if ((properties !== undefined) && (properties.Type === "BlockReference") && (properties.BlockName !== "TEXTE")) {
+                            const box = new THREE.Mesh( boxGeometry, boxMaterial );
 
-        function load3DTilesBuildings() {
-            const source = new itowns.OGC3DTilesSource({
-                url: "https://storage.googleapis.com/ahp-research/projects/sogelink/hackathon/bdnb/sampleset/tileset.json",
-                extent: viewExtent
-            });
-            const layer = new itowns.OGC3DTilesLayer('3DTiles', {
-                source,
-            });
-            return view.addLayer(layer).then((layer) => {
-                debug.createOGC3DTilesDebugUI(debugMenu.gui, view, layer);
-            });
-        }
+                            const position = new THREE.Vector3(centerCoord.x - properties.BlockOffset_coordPlanDeg[0], centerCoord.y - properties.BlockOffset_coordPlanDeg[1], properties.BlockOffset_coordPlanDeg[2]);
+                            box.position.copy(position);
 
-        function loadBuildings() {
-            const orange = new THREE.Color(0xffa400);
-            const blue = new THREE.Color(0x47edff);
-            const black = new THREE.Color(0x000000);
-            const red = new THREE.Color(0xff0000);
+                            const scale = new THREE.Vector3(properties.BlockScale[0], properties.BlockScale[1], properties.BlockScale[2]);
+                            box.scale.copy(scale);
 
-            function colorBuildings(properties, ctx) {
-                if (properties.usage_1 === 'Résidentiel') {
-                    color.set(0xFDFDFF);
-                } else if (properties.usage_1 === 'Annexe') {
-                    color.set(0xC6C5B9);
-                } else if (properties.usage_1 === 'Commercial et services') {
-                    color.set(0x62929E);
-                } else if (properties.usage_1 === 'Religieux') {
-                    color.set(0x393D3F);
-                } else if (properties.usage_1 === 'Sportif') {
-                    color.set(0x546A7B);
-                } else {
-                    color.set(0x555555);
-                }
+                            const angle = properties.BlockAngle;
+                            box.rotateZ(THREE.MathUtils.degToRad(angle));
 
-                /*
-                const distance = ctx.coordinates.planarDistanceTo(buildingCoord);
-                if (distance < 300) {
-                    return blue;
-                } else if (distance < 350){
-                    return black;
-                } else if (distance < 1000){
-                    return color;
-                } else if (distance < 1050){
-                    return red;
-                }
-                return color.lerp(orange, Math.min(distance / 4000, 1.0));
-                */
-                return color;
-            }
-
-
-            function extrudeBuildings(properties) {
-                return properties.hauteur;
-            }
-
-            function altitudeBuildings(properties) {
-                return properties.altitude_minimale_sol;
-            }
-
-            function acceptFeature(properties) {
-                return !!properties.hauteur;
-            }
-
-            const buildingsGroup = new THREE.Group();
-            buildingsGroup.name = "Building groups";
-            view.tileLayer.object3d.add(buildingsGroup);
-
-            var wfsBuildingSource = new itowns.WFSSource({
-                url: 'https://data.geopf.fr/wfs/ows?',
-                version: '2.0.0',
-                typeName: 'BDTOPO_V3:batiment',
-                crs: 'EPSG:4326',
-                ipr: 'IGN',
-                format: 'application/json',
-                extent: viewExtent
-            });
-
-            var wfsBuildingLayer = new itowns.FeatureGeometryLayer('wfsBuilding', {
-                batchId: function (property, featureId) { return featureId; },
-                filter: acceptFeature,
-                crs: viewExtentEPSG,
-                source: wfsBuildingSource,
-                object3d: buildingsGroup,
-                style: {
-                    fill: {
-                        color: colorBuildings,
-                        base_altitude: altitudeBuildings,
-                        extrusion_height: extrudeBuildings,
-                    }
-                }
-            });
-
-            return view.addLayer(wfsBuildingLayer).then((layer) => {
-                const gui = debug.GeometryDebug.createGeometryDebugUI(
-                    debugMenu.gui,
-                    view,
-                    layer
-                );
-                debug.GeometryDebug.addWireFrameCheckbox(gui, view, layer);
-            });
-        }
-
-        function loadDWG(url, centerX, centerY, centerZ) {
-            return new Promise((resolve) => {
-                gltfLoader.load(url,
-                    (glb) => {
-                        const position = new THREE.Vector3(centerX, centerY, centerZ);
-                        const offset = position.sub(centerCoord.toVector3(new THREE.Vector3()));
-
-                        const model = glb.scene;
-                        model.name = 'dwg';
-                        dwgModel = model;
-
-                        model.position.copy(new THREE.Vector3(offset.x, offset.z, -offset.y));
-
-                        // update coordinate of the mesh
-                        model.updateMatrixWorld();
-
-                        scene.add(model);
-                        view.notifyChange();
-
-                        resolve();
+                            scene.add(box);
+                        }
                     });
-            });
+                });
         }
+        */
 
         function setOrbitPoint(raycastObj) {
             const point = raycastObj.point;
             if (pivot === undefined) {
-                const geometry = new THREE.SphereGeometry(1, 32, 16);
+                const geometry = new THREE.SphereGeometry(0.1, 32, 16);
                 const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
                 const sphere = new THREE.Mesh(geometry, material);
                 pivot = sphere;
@@ -657,9 +465,6 @@
         }
 
         function onMouseMove(event) {
-            var htmlInfo = document.getElementById('infoBuilding');
-            htmlInfo.innerHTML = ' ';
-
             if (!settings.showWFSProperties || event.buttons === 1 || event.buttons === 2) {
                 return;
             }
@@ -686,29 +491,16 @@
             }
         }
 
-        function onMouseDblclick(event) {
-            customCamera.updateMatrixWorld();
-
-            const coord = view.pickTerrainCoordinates(event);
-            const realCoord = new itowns.Coordinates(viewExtentEPSG, centerCoord.longitude + coord.x, centerCoord.latitude - coord.z, centerCoord.altitude);
-            requestCoordinateData(realCoord);
-        }
-
         function onAllLoaded() {
-            const boundingSphere = new THREE.Box3().setFromObject(view.tileLayer.object3d).getBoundingSphere(new THREE.Sphere());
+            const boundingSphere = new THREE.Box3().setFromObject(scene).getBoundingSphere(new THREE.Sphere());
             controls.fitToSphere(boundingSphere, false);
             controls.rotate(0, 45 * THREE.MathUtils.DEG2RAD, false);
 
             // Add picking tool
             viewerDiv.addEventListener('mousemove', (evt) => onMouseMove(evt), true);
-            viewerDiv.addEventListener('dblclick', (evt) => onMouseDblclick(evt), true);
 
             // Used to set the orbitPoint
             viewerDiv.addEventListener("mousedown", (evt) => onMouseDown(evt), true);
-
-            if (potreeLayer != null) {
-                // debug.PointCloudDebug.initTools(view, potreeLayer, debugMenu.gui);
-            }
 
             var imageryLayers = [];
             if (layerOrtho !== undefined) {
@@ -733,144 +525,11 @@
                 loadView();
             };
 
-            debugMenu.gui.add(settings, 'imageSourceType', IMAGE_SOURCE_TYPE).name('Image source').onChange(changeSourceImage);
-            debugMenu.gui.add(settings, 'omniscaleKey').name('Omniscale key');
             debugMenu.gui.add(debugMenu, 'resize').name('Resize view extent');
-            debugMenu.gui.add(settings, 'opacity', 0.0, 1.0, 0.01).name('Global opacity').onChange(updateOpacity);
-            debugMenu.gui.add(settings, 'dwgVisibility').name('DWG visibility').onChange(updateDWGVisibility);
             debugMenu.gui.add(settings, 'showWFSProperties').name('Show properties');
-            debugMenu.gui.add(settings, 'urbsKey').name('URBS key');
-
-            if (potreeLayer != null) {
-                // update stats window
-                var info = document.getElementById('info');
-                view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_RENDER, () => {
-                    info.textContent = potreeLayer.displayedCount.toLocaleString() + ' points';
-                });
-            }
 
             animate();
             hideLoader();
-        }
-
-        function changeSourceImage() {
-            settings.imageSourceType = parseInt(settings.imageSourceType);
-            view.removeLayer('Fond de carte');
-            loadOrtho();
-        }
-
-        function updateOpacity() {
-            view.tileLayer.opacity = settings.opacity;
-            view.notifyChange();
-        }
-
-        function updateDWGVisibility() {
-            dwgModel.visible = settings.dwgVisibility;
-            view.notifyChange();
-        }
-
-        function loadCadastre() {
-            const sourceMap = new itowns.WFSSource({
-                url: 'https://data.geopf.fr/wfs/ows?',
-                version: '2.0.0',
-                typeName: 'CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle',
-                crs: 'EPSG:4326',
-                ipr: 'IGN',
-                format: 'application/json',
-            });
-
-            const layer = new itowns.ColorLayer('Cadastre', { source: sourceMap });
-            return view.addLayer(layer);
-        }
-
-        function loadCadastreWFS() {
-            const cadastreGroup = new THREE.Group();
-            cadastreGroup.name = "cadastre";
-            view.tileLayer.object3d.add(cadastreGroup);
-
-            var source = new itowns.WFSSource({
-                url: 'https://data.geopf.fr/wfs/ows?',
-                version: '2.0.0',
-                typeName: 'CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle',
-                crs: 'EPSG:4326',
-                ipr: 'IGN',
-                format: 'application/json',
-            });
-
-            var tile;
-            function altitudeLine(properties, ctx) {
-                var result;
-                var z = 0;
-                if (ctx.coordinates) {
-                    result = itowns.DEMUtils.getTerrainObjectAt(view.tileLayer, ctx.coordinates, 0, tile);
-                    if (!result) {
-                        result = itowns.DEMUtils.getTerrainObjectAt(view.tileLayer, ctx.coordinates, 0);
-                    }
-                    if (result) {
-                        tile = [result.tile];
-                        z = result.coord.z;
-                    }
-                    return z;
-                }
-            }
-
-            var layer = new itowns.FeatureGeometryLayer('wfsCadastre', {
-                transparent: true,
-                crs: viewExtentEPSG,
-                source: source,
-                object3d: cadastreGroup,
-                style: {
-                    fill: {
-                        color: "#FF0000",
-                        base_altitude: altitudeLine,
-                        extrusion_height: 1,
-                        opacity: 0.01
-                    }
-                }
-            });
-            layer.opacity = 0.2;
-
-            return view.addLayer(layer).then((layer) => {
-                const gui = debug.GeometryDebug.createGeometryDebugUI(
-                    debugMenu.gui,
-                    view,
-                    layer
-                );
-                debug.GeometryDebug.addWireFrameCheckbox(gui, view, layer);
-            });
-        }
-
-        function requestCoordinateData(coordinate) {
-            var htmlInfo = document.getElementById('urbsInfo');
-            htmlInfo.innerHTML = ' ';
-
-            const tmpCoordinate = coordinate.clone().as('EPSG:4326');
-            return itowns.Fetcher.json(`https://api.urbs.fr/addressList/byCoords?lat=${tmpCoordinate.latitude}&lon=${tmpCoordinate.longitude}`)
-                .then((addressResponse) => {
-                    if (addressResponse.length) {
-                        const address = addressResponse[0];
-
-                        htmlInfo.innerHTML += '<li><b>address: </b>' + address.address + '</li>';
-                        htmlInfo.innerHTML += '<li><b>postcode: </b>' + address.postcode + '</li>';
-                        htmlInfo.innerHTML += '<li><b>city: </b>' + address.city + '</li>';
-
-                        itowns.Fetcher.json(`https://api.urbs.fr/address?id=${address.id}&attributes=chauffage,consoelec,consogaz,consoelec_detail,ndpe,jannatmin,prix`,
-                            {
-                                headers: {
-                                    Authorization: `Bearer ${settings.urbsKey}`
-                                }
-                            })
-                            .then((response) => {
-                                const urbsAttributes = response[0].attributes;
-
-                                htmlInfo.innerHTML += '<li><b>chauffage: </b>' + urbsAttributes.chauffage.value + '</li>';
-                                htmlInfo.innerHTML += '<li><b>conso dpe: </b>' + urbsAttributes.ndpe.value + ' kWh/m2.an</li>';
-                                htmlInfo.innerHTML += '<li><b>annee construction: </b>' + urbsAttributes.jannatmin.value + '</li>';
-                                htmlInfo.innerHTML += '<li><b>conso elec: </b>' + urbsAttributes.consoelec.value + ' MWhEF/an</li>';
-                                htmlInfo.innerHTML += '<li><b>prix de vente: </b>' + urbsAttributes.prix.value + ' €/m2</li>';
-                            });
-                    }
-                });
         }
     </script>
 </body>
