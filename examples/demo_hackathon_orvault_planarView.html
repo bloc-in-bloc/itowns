@@ -29,9 +29,12 @@
             "debug": "../dist/debug.js",
             "three": "https://esm.sh/three@0.182.0",
             "three/addons/": "https://esm.sh/three@0.182.0/examples/jsm/",
+            "three/examples/": "https://esm.sh/three@0.182.0/examples/",
             "camera-controls": "https://esm.sh/camera-controls@2.7.2",
             "dat": "https://esm.sh/dat.gui@0.7.9",
-            "lil": "https://esm.sh/lil-gui@0.19.2"
+            "lil": "https://esm.sh/lil-gui@0.19.2",
+            "three-geojson": "https://esm.sh/gh/gkjohnson/three-geojson",
+            "three-geojson/src/": "https://esm.sh/gh/gkjohnson/three-geojson/src/"
         }
     }
     </script>
@@ -43,6 +46,9 @@
         import GuiTools from "./jsm/GUI/GuiTools.js";
         import * as debug from 'debug';
         import lil from 'lil';
+        import { GeoJSONLoader } from 'three-geojson';
+        import { constructLineSegments2 } from './jsm/plugins/ConstructLine2Utils.js';
+        import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 
         var pointCloudLayer;
         var viewerDiv;
@@ -70,9 +76,9 @@
         itowns.CRS.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
         itowns.CRS.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
 
-        let extentSize = 200;
-        const viewEPSG = "EPSG:3947";
-        const centerCoord = new itowns.Coordinates(viewEPSG, 1351152.118201931, 6240395.0059363097, 61.329999999999998);
+        let extentSize = 1000;
+        const viewEPSG = "EPSG:2154";
+        const centerCoord = new itowns.Coordinates(viewEPSG, 849061.7717000023, 6518169.295000002, 0);
 
         var customRenderer = createRenderer();
         var rendererSize = customRenderer.getSize(new THREE.Vector2());
@@ -187,9 +193,9 @@
             debugMenu = new GuiTools('menuDiv', view);
 
             Promise.all([
-                loadElevation(),
+                // loadElevation(),
                 loadOrtho(),
-                loadPointCloud(),
+                loadGeoJson()
             ])
                 .then(onAllLoaded);
         }
@@ -222,25 +228,76 @@
             return view.addLayer(layerOrtho);
         }
 
-        async function loadPointCloud() {
-            const pointCloudGroup = new THREE.Group();
-            pointCloudGroup.name = "PointCloudGroup";
+        async function loadGeoJson() {
+            const folderUrl = "http://localhost:8080/test";
+            const response = await fetch(folderUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            const jsonFiles = await response.json();
 
-            const pointCloudSource = new itowns.CopcSource({
-                file: 'metadata.json',
-                url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/PointCloudOrvault-3947.copc.laz',
-                crs: 'EPSG:3947',
+            // Fetch all JSON files in parallel
+            const fetchPromises = jsonFiles.map(jsonFile => fetch(`${folderUrl}/${jsonFile}`).then(res => res.json()));
+
+            // Wait for all fetches to complete
+            const results = await Promise.all(fetchPromises);
+
+            results.forEach(result => {
+                loadGeoJsonContent(result);
             });
 
-            // Configure Point Cloud layer
-            pointCloudLayer = new itowns.CopcLayer('points_cloud', {
-                object3d: pointCloudGroup,
-                source: pointCloudSource
-            });
+            return results;
+        }
 
-            view.tileLayer.object3d.add(pointCloudGroup);
-            await itowns.View.prototype.addLayer.call(view, pointCloudLayer);
-            return pointCloudLayer;
+        async function loadGeoJsonContent(content) {
+            try {
+                const data = new GeoJSONLoader().parse(content);
+                if (data.lines.length > 0) {
+                    console.log(content.name);
+                    data.lines.forEach(line => {
+                        if (line.data !== null) {
+                            line.data = line.data.map(vertices => {
+                                return vertices.filter(vertex => vertex !== null).map(vertex => {
+                                    const localPositon = convertWorldToLocalPosition(new THREE.Vector3(vertex[0], vertex[1], vertex[2]));
+                                    return [localPositon.x, localPositon.y, localPositon.z];
+                                });
+                            });
+                        }
+
+                        const lineMaterial = new LineMaterial();
+                        lineMaterial.linewidth = 2;
+                        lineMaterial.color = new THREE.Color("#FF0000");
+                        lineMaterial.depthTest = false;
+                        lineMaterial.depthWrite = false;
+                        lineMaterial.transparent = true;
+                        const lineObject = constructLineSegments2(line.data, lineMaterial);
+                        scene.add(lineObject);
+                    });
+                }
+
+                if (data.points.length > 0) {
+                    data.points.forEach(point => {
+                        if (point.data !== null) {
+                            point.data.forEach(vertex => {
+                                const localPositon = convertWorldToLocalPosition(new THREE.Vector3(vertex[0], vertex[1], vertex[2]));
+                                const geometry = new THREE.SphereGeometry(0.5, 8, 8);
+                                const material = new THREE.MeshStandardMaterial({ color: 0x00ff00 });
+                                const sphere = new THREE.Mesh(geometry, material);
+                                sphere.position.set(localPositon.x, localPositon.y, localPositon.z);
+                                scene.add(sphere);
+                            });
+                        }
+                    });
+                }
+            } catch (error) {
+                console.log(error);
+            }
+        }
+
+        function convertWorldToLocalPosition(position) {
+            return new THREE.Vector3(-(centerCoord.x - position.x), position.z !== 0 ? centerCoord.z - position.z : 0, (centerCoord.y - position.y));
         }
 
         function setOrbitPoint(raycastObj) {
