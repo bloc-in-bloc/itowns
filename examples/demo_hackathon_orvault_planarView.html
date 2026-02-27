@@ -227,16 +227,16 @@
             debugMenu = new GuiTools('menuDiv', view);
 
             Promise.all([
-                loadGlbFile('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/glb/01_batiment_v_6.glb', 1351152.118201931, 6240395.0059363097, 61.329999999999998),
-                loadGlbFile('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/glb/02_ep.glb', 1351179.6215255815, 6240386.4719831934, 51.503709487999998),
+                // loadGlbFile('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/glb/01_batiment_v_6.glb', 1351152.118201931, 6240395.0059363097, 61.329999999999998),
+                // loadGlbFile('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/glb/02_ep.glb', 1351179.6215255815, 6240386.4719831934, 51.503709487999998),
                 loadElevation(),
                 loadOrtho(),
                 loadPointCloud(),
-                loadGeoJson(),
-                loadGeoTiff(),
+                // loadGeoJson(),
+                // loadGeoTiff(),
                 // load3DTilesBuildings(),
-                loadBuildings(),
-                loadDWG('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/glb/orvault_dwg.glb', 1351181.19728317, 6240384.04393169, 51.8335)
+                // loadBuildings(),
+                // loadDWG('https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/glb/orvault_dwg.glb', 1351181.19728317, 6240384.04393169, 51.8335)
                 // loadCadastre(),
                 // loadCadastreWFS()
             ])
@@ -332,17 +332,51 @@
             const pointCloudGroup = new THREE.Group();
             pointCloudGroup.name = "PointCloudGroup";
 
-            const pointCloudSource = new itowns.CopcSource({
-                url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/PointCloudOrvault-3947.copc.laz',
-                crs: 'EPSG:3947',
-            });
+            const pointCloudType = "Potree1.7";
 
-            // Configure Point Cloud layer
-            pointCloudLayer = new itowns.CopcLayer('points_cloud', {
-                object3d: pointCloudGroup,
-                source: pointCloudSource,
-                crs: viewExtentEPSG
-            });
+            let pointCloudSource;
+
+            switch (pointCloudType){
+                case "Potree1.7":
+                    pointCloudSource = new itowns.PotreeSource({
+                        url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/Orvault-Potree1_7-3947/cloud.js',
+                        crs: 'EPSG:3947',
+                    });
+
+                    // Configure Point Cloud layer
+                    pointCloudLayer = new itowns.PotreeLayer('points_cloud', {
+                        object3d: pointCloudGroup,
+                        source: pointCloudSource,
+                        crs: viewExtentEPSG
+                    });
+                    break;
+                case "Potree2.0":
+                    pointCloudSource = new itowns.Potree2Source({
+                        url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/Orvault-Potree2-brotli-3947/metadata.json',
+                        crs: 'EPSG:3947',
+                    });
+                    // Configure Point Cloud layer
+                    pointCloudLayer = new itowns.Potree2Layer('points_cloud', {
+                        object3d: pointCloudGroup,
+                        source: pointCloudSource,
+                        crs: viewExtentEPSG
+                    });
+                    break;
+                case "copc":
+                    pointCloudSource = new itowns.PotreeSource({
+                        url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/Orvault-Potree1_7-3947/cloud.js',
+                        crs: 'EPSG:3947',
+                    });
+                    // Configure Point Cloud layer
+                    pointCloudLayer = new itowns.PotreeLayer('points_cloud', {
+                        object3d: pointCloudGroup,
+                        source: pointCloudSource,
+                        crs: viewExtentEPSG
+                    });
+                    break;
+                default:
+                    break;
+            }
 
             await pointCloudSource.whenReady;
 
