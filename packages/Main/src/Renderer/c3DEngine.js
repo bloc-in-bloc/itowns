@@ -11,6 +11,7 @@ import { unpack1K } from 'Renderer/LayeredMaterial';
 import Label2DRenderer from 'Renderer/Label2DRenderer';
 import { deprecatedC3DEngineWebGLOptions } from 'Core/Deprecated/Undeprecator';
 import { EffectComposer } from 'postprocessing';
+import PointCloudRenderer from 'Renderer/PointCloudRenderer';
 
 const depthRGBA = new THREE.Vector4();
 class c3DEngine {
@@ -57,24 +58,6 @@ class c3DEngine {
         this.fullSizeRenderTarget.depthTexture = new THREE.DepthTexture();
         this.fullSizeRenderTarget.depthTexture.type = THREE.UnsignedShortType;
 
-        this.renderView = function _(view) {
-            // force internally calling state.buffers.color.setClear
-            // to get a correct background color
-            this.renderer.setClearAlpha(this.renderer.getClearAlpha());
-
-            this.renderer.clear();
-            if (view._camXR) {
-                this.renderer.render(view.scene, view._camXR);
-            } else if (this.composer.passes.length) {
-                this.composer.render();
-            } else {
-                this.renderer.render(view.scene, view.camera3D);
-            }
-            if (view.tileLayer) {
-                this.label2dRenderer.render(view.tileLayer.object3d, view.camera3D);
-            }
-        }.bind(this);
-
         /**
          * @type {Function}
          * @param {number} w
@@ -110,6 +93,36 @@ class c3DEngine {
             }
             throw ex;
         }
+
+        this.pointCloudRenderer = new PointCloudRenderer(this.renderer, this.width, this.height);
+
+        this.renderView = function _(view) {
+            // force internally calling state.buffers.color.setClear
+            // to get a correct background color
+            this.renderer.setClearAlpha(this.renderer.getClearAlpha());
+
+            this.renderer.clear();
+            if (view._camXR) {
+                this.renderer.render(view.scene, view._camXR);
+            } else if (this.composer.passes.length) {
+                this.composer.render();
+            } else {
+                const layers = view.getLayers(layer => layer.isGeometryLayer);
+                const pointclouds = layers.filter(layer => layer.isPointCloudLayer && layer.visible);
+                const others = layers.filter(layer => !layer.isPointCloudLayer && layer.visible);
+
+                others.forEach((layer) => { layer.object3d.visible = false; });
+                this.pointCloudRenderer.render(view.scene, view.camera3D);
+                others.forEach((layer) => { layer.object3d.visible = true; });
+
+                pointclouds.forEach((layer) => { layer.object3d.visible = false; });
+                this.renderer.render(view.scene, view.camera3D);
+                pointclouds.forEach((layer) => { layer.object3d.visible = true; });
+            }
+            if (view.tileLayer) {
+                this.label2dRenderer.render(view.tileLayer.object3d, view.camera3D);
+            }
+        }.bind(this);
 
         // Let's allow our canvas to take focus
         // The condition below looks weird, but it's correct: querying tabIndex
