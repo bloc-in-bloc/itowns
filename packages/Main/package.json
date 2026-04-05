@@ -23,7 +23,7 @@
     "prepublishOnly": "npx copyfiles -u 1 \"../../examples/**/*\" ./examples/ && npx copyfiles -u 1 \"../../docs/**/*\" ./docs/ && npx copyfiles -u 1 \"../../dist/**/*\" ./dist/ ",
     "postpublish": "node clean.cjs",
     "publish-latest": "npm publish --access public --tag=latest --provenance",
-    "publish-next": "npm publish --access public --tag=next --provenance",
+    "publish-next": "npm publish --access public --tag=next",
     "version": "cross-env-shell npm install @itowns/geographic@$npm_package_version && node scripts/version.mjs"
   },
   "c8": {
