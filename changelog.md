@@ -1,3 +1,10 @@
+<a name="2.46.1-next.2"></a>
+## [2.46.1-next.2](https://github.com/iTowns/itowns/compare/v2.46.1-next.1...v2.46.1-next.2) (2026-04-05)
+
+
+### Others
+
+* Add missing export ([efdfec2](https://github.com/iTowns/itowns/commit/efdfec2))
 <a name="2.46.1-next.1"></a>
 ## [2.46.1-next.1](https://github.com/iTowns/itowns/compare/v2.46.1-next.0...v2.46.1-next.1) (2026-04-05)
 <a name="2.46.1-next.0"></a>
