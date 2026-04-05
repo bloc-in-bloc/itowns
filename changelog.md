@@ -1,3 +1,5 @@
+<a name="2.46.1-next.1"></a>
+## [2.46.1-next.1](https://github.com/iTowns/itowns/compare/v2.46.1-next.0...v2.46.1-next.1) (2026-04-05)
 <a name="2.46.1-next.0"></a>
 ## [2.46.1-next.0](https://github.com/iTowns/itowns/compare/v2.46.0...v2.46.1-next.0) (2026-04-05)
 
