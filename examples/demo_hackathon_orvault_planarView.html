@@ -44,6 +44,23 @@
         import * as debug from 'debug';
         import lil from 'lil';
 
+        class PointCloudPoint {
+            constructor(geometry, index) {
+                this.geometry = geometry;
+                this.index = index;
+                this.originalColor = new THREE.Color().fromBufferAttribute(
+                    this.geometry.attributes.color,
+                    index,
+                );
+            }
+
+            setColor(color) {
+                const colors = this.geometry.attributes.color;
+                colors.setXYZ(this.index, color.r, color.g, color.b);
+                colors.needsUpdate = true;
+            }
+        }
+
         var pointCloudLayer;
         var viewerDiv;
         var debugGui;
@@ -58,6 +75,7 @@
         var raycaster = new THREE.Raycaster();
         let layerOrtho;
         let layerElevation;
+        let coloredPoints = [];
 
         CameraControls.install({ THREE: THREE });
 
@@ -69,10 +87,11 @@
         // Define crs projection that we will use (taken from https://epsg.io/3946, Proj4js section)
         itowns.CRS.defs('EPSG:2154', '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs');
         itowns.CRS.defs('EPSG:3947', '+proj=lcc +lat_0=47 +lon_0=3 +lat_1=46.25 +lat_2=47.75 +x_0=1700000 +y_0=6200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
+        itowns.CRS.defs('EPSG:3943', '+proj=lcc +lat_0=43 +lon_0=3 +lat_1=42.25 +lat_2=43.75 +x_0=1700000 +y_0=2200000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs');
 
         let extentSize = 30;
-        const viewEPSG = "EPSG:3947";
-        const centerCoord = new itowns.Coordinates(viewEPSG, 1851887.5003499996, 6233434.7442499995, 270);
+        const viewEPSG = "EPSG:3943";
+        const centerCoord = new itowns.Coordinates(viewEPSG, 1950274.2912, 2218320.5385999996, 36);
 
         var customRenderer = createRenderer();
         var rendererSize = customRenderer.getSize(new THREE.Vector2());
@@ -228,8 +247,8 @@
 
             const pointCloudSource = new itowns.CopcSource({
                 file: 'metadata.json',
-                url: 'https://raw.githubusercontent.com/bloc-in-bloc/sample-datas/main/copc/cartolia_cc47.copc.laz',
-                crs: 'EPSG:3947',
+                url: 'http://127.0.0.1:8081/CALIBIRE.copc.laz',
+                crs: 'EPSG:3943',
             });
 
             // Configure Point Cloud layer
@@ -245,13 +264,33 @@
 
             view.tileLayer.object3d.add(pointCloudGroup);
             await itowns.View.prototype.addLayer.call(view, pointCloudLayer);
+
+            console.log(pointCloudLayer.root.voxelOBB.natBox);
+
             return pointCloudLayer;
+        }
+
+        function colorPoints(points) {
+            for (const point of points) {
+                if (point.object && point.object.geometry && point.index !== undefined) {
+                    const pointCloudPoint = new PointCloudPoint(point.object.geometry, point.index);
+                    pointCloudPoint.setColor(new THREE.Color(0, 1, 0));
+                    coloredPoints.push(pointCloudPoint);
+                }
+            }
+        }
+
+        function resetPointCloudColor() {
+            coloredPoints.forEach((pointCloudPoint) => {
+                pointCloudPoint.setColor(pointCloudPoint.originalColor);
+            });
+            coloredPoints = [];
         }
 
         function setOrbitPoint(raycastObj) {
             const point = raycastObj.point;
             if (pivot === undefined) {
-                const geometry = new THREE.SphereGeometry(0.02, 32, 16);
+                const geometry = new THREE.SphereGeometry(0.005, 32, 16);
                 const material = new THREE.MeshBasicMaterial({ color: 0xffff00 });
                 const sphere = new THREE.Mesh(geometry, material);
                 pivot = sphere;
@@ -265,38 +304,15 @@
             customCamera.updateMatrixWorld();
             raycaster.setFromCamera(view.eventToNormalizedCoords(event), customCamera);
 
-            const raycastResults = [];
             let viewRaycastResults = view.pickObjectsAt(event, 5);
 
-            const cameraPos = view.camera3D.getWorldPosition(new THREE.Vector3());
-            const cameraPosCoord = new itowns.Coordinates(view.referenceCrs);
-            cameraPosCoord.setFromVector3(cameraPos);
-            const coord = view.pickTerrainCoordinates(event);
-
-            viewRaycastResults = viewRaycastResults.map((r) => {
-                if (r.layer.isTiledGeometryLayer) {
-                    // Get position from coord
-                    r.point = new THREE.Vector3();
-                    coord.toVector3(r.point);
-                    // Compute distance between point and camera
-                    r.distance = r.point.distanceTo(cameraPos);
-                }
-                return r;
-            });
-            viewRaycastResults.sort((r1, r2) => r1.distance > r2.distance);
-
+            resetPointCloudColor();
+            console.log("pickPointsAt result length:", viewRaycastResults.length);
             if (viewRaycastResults.length > 0) {
-                // Find index element to insert
-                let index = 0;
-                const elementToInsert = viewRaycastResults[0];
-                while ((index < raycastResults.length) && (elementToInsert.distance > raycastResults[index].distance)) {
-                    index++;
+                colorPoints(viewRaycastResults);
+                if(viewRaycastResults[0].point) {
+                    setOrbitPoint(viewRaycastResults[0]);
                 }
-                raycastResults.splice(index, 0, elementToInsert);
-            }
-
-            if (raycastResults.length > 0) {
-                setOrbitPoint(raycastResults[0]);
             }
         }
 

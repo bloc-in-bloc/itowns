@@ -9,7 +9,6 @@ export async function getSource() {
     }
     if (!sourcePromise) {
         sourcePromise = (async () => {
-            // @ts-expect-error - EntwinePointTileSource only requires url
             cachedSource = new itowns.EntwinePointTileSource({
                 url: 'https://download.data.grandlyon.com/files/grandlyon/imagerie/mnt2018/lidar/ept/',
             });
