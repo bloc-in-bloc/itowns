@@ -18,7 +18,7 @@ const viewerDiv = document.getElementById('viewerDiv');
 // Create a GlobeView
 const view = new itowns.GlobeView(viewerDiv);
 
-// Add navigation widget
+// Add navigation  widget
 const navigation = new Navigation(view, {
     position: 'bottom-right',
     translate: { y: -40 },
