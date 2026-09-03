@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "@itowns/widgets",
+  "name": "@itowns-sogelink/widgets",
   "version": "2.46.0",
   "description": "Widgets",
   "type": "module",
@@ -13,7 +13,7 @@
     "transpileOnly": "cross-env BABEL_DISABLE_CACHE=1 babel src --out-dir lib --extensions .js,.ts",
     "transpile": "npm run transpileOnly && npm run copy_transpile",
     "watch": "npm run transpileOnly -- --watch",
-    "version": "cross-env-shell npm pkg set dependencies.@itowns/geographic=^$npm_package_version dependencies.itowns=^$npm_package_version"
+    "version": "cross-env-shell npm pkg set dependencies.@itowns-sogelink/geographic=^$npm_package_version dependencies.itowns-sogelink=^$npm_package_version"
   },
   "files": [
     "*.md",
@@ -30,7 +30,7 @@
   },
   "homepage": "https://itowns.github.io/",
   "dependencies": {
-    "@itowns/geographic": "^2.46.0",
-    "itowns": "^2.46.0"
+    "@itowns-sogelink/geographic": "^2.46.0",
+    "itowns-sogelink": "^2.46.0"
   }
 }

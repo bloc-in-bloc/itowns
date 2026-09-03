@@ -1,5 +1,5 @@
 {
-  "name": "@itowns/geographic",
+  "name": "@itowns-sogelink/geographic",
   "version": "2.46.0",
   "description": "Proj4-based three.js geodesy toolkit",
   "type": "module",
