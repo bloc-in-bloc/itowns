@@ -42,11 +42,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/iTowns/itowns.git"
+    "url": "git+https://github.com/bloc-in-bloc/itowns.git"
   },
   "license": "(CECILL-B OR MIT)",
   "bugs": {
-    "url": "https://github.com/iTowns/itowns/issues"
+    "url": "https://github.com/bloc-in-bloc/itowns/issues"
   },
   "dependencies": {
     "@itowns/geographic": "^2.46.0",

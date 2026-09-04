@@ -22,11 +22,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/iTowns/itowns.git"
+    "url": "git+https://github.com/bloc-in-bloc/itowns.git"
   },
   "license": "(CECILL-B OR MIT)",
   "bugs": {
-    "url": "https://github.com/itowns/itowns/issues"
+    "url": "https://github.com/bloc-in-bloc/itowns/issues"
   },
   "homepage": "https://itowns.github.io/",
   "dependencies": {
