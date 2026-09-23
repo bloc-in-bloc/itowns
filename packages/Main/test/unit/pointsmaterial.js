@@ -133,4 +133,20 @@ describe('PointsMaterial', function () {
             assert.equal(classificationTexture.userData.transparent, true);
         });
     });
+
+    describe('#weighted / #hardness', function () {
+        it('should default to unweighted with hardness 1.5', function () {
+            const material = new PointsMaterial();
+            assert.equal(material.weighted, false);
+            assert.equal(material.hardness, 1.5);
+        });
+
+        it('should expose weighted and hardness as uniforms', function () {
+            const material = new PointsMaterial();
+            material.weighted = true;
+            material.hardness = 2;
+            assert.equal(material.uniforms.weighted.value, true);
+            assert.equal(material.uniforms.hardness.value, 2);
+        });
+    });
 });
