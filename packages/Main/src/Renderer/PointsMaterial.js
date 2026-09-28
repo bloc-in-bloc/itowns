@@ -163,6 +163,11 @@ class PointsMaterial extends THREE.ShaderMaterial {
      * **Warning:** ADAPTIVE work only if point cloud is an octree
      * @param      {number}  [options.minAttenuatedSize=3]  minimum scale used by 'ATTENUATED' size mode
      * @param      {number}  [options.maxAttenuatedSize=10]  maximum scale used by 'ATTENUATED' size mode
+     * @param      {boolean} [options.weighted=false]  When true, the fragment shader outputs a
+     * weighted `color * weight` / `weight` pair instead of a final color, for use in the
+     * High-Quality Splats attribute pass. See {@link View#pointCloudQuality}.
+     * @param      {number}  [options.hardness=1.5]  Smoothness of the High-Quality Splats weight
+     * falloff (`weight = (1 - distance^2)^hardness`). Only used when `weighted` is true.
      *
      * @property {object} options - options for the PointsMaterial.
      * @property {THREE.Vector2}  [options.intensityRange=new THREE.Vector2(1, 65536)]  intensity range (default value will be [1, 65536] if not defined at Layer level).
@@ -203,6 +208,8 @@ class PointsMaterial extends THREE.ShaderMaterial {
             gamma = 1.0,
             scale = 0.05 * 0.5 / Math.tan(1.0 / 2.0),
             ambientBoost = 0.0,
+            weighted = false,
+            hardness = 1.5,
             ...materialOptions
         } = options;
 
@@ -243,6 +250,8 @@ class PointsMaterial extends THREE.ShaderMaterial {
         CommonMaterial.setUniformProperty(this, 'maxAttenuatedSize', maxAttenuatedSize);
         CommonMaterial.setUniformProperty(this, 'gamma', gamma);
         CommonMaterial.setUniformProperty(this, 'ambientBoost', ambientBoost);
+        CommonMaterial.setUniformProperty(this, 'weighted', weighted);
+        CommonMaterial.setUniformProperty(this, 'hardness', hardness);
 
         // Adaptive point size uniforms
         CommonMaterial.setUniformProperty(this, 'octreeSpacing', 1.0);
@@ -405,6 +414,26 @@ class PointsMaterial extends THREE.ShaderMaterial {
     /** @param {number} ambientBoost */
     set ambientBoost(ambientBoost) {
         this.uniforms.ambientBoost.value = ambientBoost;
+    }
+
+    /** @returns {boolean} */
+    get weighted() {
+        return this.uniforms.weighted.value;
+    }
+
+    /** @param {boolean} weighted */
+    set weighted(weighted) {
+        this.uniforms.weighted.value = weighted;
+    }
+
+    /** @returns {number} */
+    get hardness() {
+        return this.uniforms.hardness.value;
+    }
+
+    /** @param {number} hardness */
+    set hardness(hardness) {
+        this.uniforms.hardness.value = hardness;
     }
 
     recomputeClassification() {

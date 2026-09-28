@@ -300,6 +300,11 @@ class Renderer {
         this.domElement.parentElement = new DOMElement();
         this.domElement.parentElement.appendChild(this.domElement);
 
+        // Arbitrary non-default values, so tests can tell a real save/restore
+        // apart from a value that simply happens to already be the default.
+        this._clearColor = new THREE.Color(0x123456);
+        this._clearAlpha = 0.5;
+
         this.xr = new EventDispatcher();
         this.xr.isPresenting = false;
         this.xr.getReferenceSpace = () => ({
@@ -417,7 +422,13 @@ class Renderer {
 
     getSize() { return new THREE.Vector2(4, 4); } // arbitrary size
     setSize() {}
-    setClearColor() {}
+    setClearColor(color, alpha = 1) {
+        this._clearColor.set(color);
+        this._clearAlpha = alpha;
+    }
+    getClearColor(target = new THREE.Color()) {
+        return target.copy(this._clearColor);
+    }
     getRenderTarget() {}
     setRenderTarget() {}
     clear() {}
@@ -426,8 +437,8 @@ class Renderer {
     readRenderTargetPixelsAsync() { }
     getContext() { return this.context; }
     getDrawingBufferSize() { return new THREE.Vector2(4, 4); } // arbitrary size
-    getClearAlpha() { return 1; }
-    setClearAlpha() {}
+    getClearAlpha() { return this._clearAlpha; }
+    setClearAlpha(alpha) { this._clearAlpha = alpha; }
     dispose() {}
 }
 

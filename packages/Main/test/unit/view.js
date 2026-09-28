@@ -176,4 +176,29 @@ describe('Viewer', function () {
         });
         assert.equal(view.camera3D, camera);
     });
+
+    describe('pointCloudQuality', function () {
+        it('should default to normal', function () {
+            assert.equal(viewer.pointCloudQuality, 'normal');
+        });
+
+        it('should add the High-Quality Splats passes to the composer when set to high', function () {
+            const before = viewer.mainLoop.gfxEngine.composer.passes.length;
+            viewer.pointCloudQuality = 'high';
+            assert.equal(viewer.pointCloudQuality, 'high');
+            assert.equal(viewer.mainLoop.gfxEngine.composer.passes.length, before + 2);
+        });
+
+        it('should remove the passes when set back to normal', function () {
+            viewer.pointCloudQuality = 'high';
+            const before = viewer.mainLoop.gfxEngine.composer.passes.length;
+            viewer.pointCloudQuality = 'normal';
+            assert.equal(viewer.pointCloudQuality, 'normal');
+            assert.equal(viewer.mainLoop.gfxEngine.composer.passes.length, before - 2);
+        });
+
+        it('should reject invalid values', function () {
+            assert.throws(() => { viewer.pointCloudQuality = 'ultra'; });
+        });
+    });
 });

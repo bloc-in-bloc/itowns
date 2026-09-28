@@ -290,6 +290,26 @@ class View extends THREE.EventDispatcher {
     }
 
     /**
+     * Gets or sets the point cloud rendering quality.
+     *
+     * `'normal'` (default) renders point clouds as independent,
+     * depth-tested splats. `'high'` enables the High-Quality Splats
+     * rendering mode, blending overlapping splats into a smoother surface
+     * (see M. Schütz, "Potree: Rendering Large Point Clouds in Web
+     * Browsers", 2016 thesis, §4.2.2). Applies to every layer with
+     * `isPointCloudLayer === true`.
+     * @type {'normal'|'high'}
+     */
+    get pointCloudQuality() {
+        return this.mainLoop.gfxEngine.pointCloudQuality;
+    }
+
+    set pointCloudQuality(quality) {
+        this.mainLoop.gfxEngine.setPointCloudQuality(this, quality);
+        this.notifyChange();
+    }
+
+    /**
      * Dispose viewer before delete it.
      *
      * Method dispose all viewer objects
