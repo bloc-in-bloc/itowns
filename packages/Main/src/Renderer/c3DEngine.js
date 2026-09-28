@@ -11,6 +11,8 @@ import { unpack1K } from 'Renderer/LayeredMaterial';
 import Label2DRenderer from 'Renderer/Label2DRenderer';
 import { deprecatedC3DEngineWebGLOptions } from 'Core/Deprecated/Undeprecator';
 import { EffectComposer } from 'postprocessing';
+import HiddenPointCloudsRenderPass from 'Renderer/HiddenPointCloudsRenderPass';
+import HighQualitySplatsPass from 'Renderer/HighQualitySplatsPass';
 
 const depthRGBA = new THREE.Vector4();
 class c3DEngine {
@@ -138,11 +140,17 @@ class c3DEngine {
         this.composer = new EffectComposer(this.renderer, {
             frameBufferType: THREE.HalfFloatType,
         });
+
+        this._pointCloudQuality = 'normal';
+        this._hiddenPointCloudsPass = null;
+        this._highQualitySplatsPass = null;
     }
 
     dispose() {
         this.label2dRenderer.domElement.parentElement?.removeChild(this.label2dRenderer.domElement);
         this.fullSizeRenderTarget.dispose();
+        this._hiddenPointCloudsPass?.dispose();
+        this._highQualitySplatsPass?.dispose();
         this.composer.dispose();
         if (this._shouldDisposeRenderer) {
             this.renderer.domElement.parentElement?.removeChild(this.renderer.domElement);
@@ -160,6 +168,49 @@ class c3DEngine {
      */
     getRenderer() {
         return this.renderer;
+    }
+
+    /**
+     * The current point cloud rendering quality.
+     * @returns {'normal'|'high'}
+     */
+    get pointCloudQuality() {
+        return this._pointCloudQuality;
+    }
+
+    /**
+     * Sets the point cloud rendering quality.
+     *
+     * `'high'` enables the High-Quality Splats rendering mode: point clouds
+     * are rendered through an extra depth/attribute/normalization pass
+     * sequence that blends overlapping splats into a smoother surface (see
+     * M. Schütz, "Potree: Rendering Large Point Clouds in Web Browsers",
+     * 2016 thesis, §4.2.2). `'normal'` (default) is a no-op on the composer.
+     *
+     * @param {View} view - the view whose point clouds should be rendered.
+     * @param {'normal'|'high'} quality - the quality to switch to.
+     */
+    setPointCloudQuality(view, quality) {
+        if (quality !== 'normal' && quality !== 'high') {
+            throw new Error(`Invalid pointCloudQuality '${quality}', expected 'normal' or 'high'.`);
+        }
+        if (this._pointCloudQuality === quality) {
+            return;
+        }
+        this._pointCloudQuality = quality;
+
+        if (!this._hiddenPointCloudsPass) {
+            this._hiddenPointCloudsPass = new HiddenPointCloudsRenderPass(view);
+            this._highQualitySplatsPass = new HighQualitySplatsPass(view);
+        }
+
+        if (quality === 'high') {
+            this.composer.addPass(this._hiddenPointCloudsPass);
+            this.composer.addPass(this._highQualitySplatsPass);
+        } else {
+            this.composer.removePass(this._hiddenPointCloudsPass);
+            this.composer.removePass(this._highQualitySplatsPass);
+        }
     }
 
     /**
