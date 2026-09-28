@@ -117,6 +117,13 @@
                 // add GUI
                 debug.PointCloudDebug.initTools(view, potreeLayer, debugGui);
 
+                // High-Quality Splats toggle
+                var hqSplatsState = { enabled: false };
+                debugGui.add(hqSplatsState, 'enabled').name('High-Quality Splats').onChange(function (value) {
+                    view.pointCloudQuality = value ? 'high' : 'normal';
+                    view.notifyChange();
+                });
+
                 // update stats window
                 var info = document.getElementById('info');
                 view.addFrameRequester(itowns.MAIN_LOOP_EVENTS.AFTER_RENDER, () => {

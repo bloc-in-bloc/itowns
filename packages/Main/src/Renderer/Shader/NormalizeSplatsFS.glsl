@@ -1,5 +1,3 @@
-#extension GL_EXT_frag_depth : enable
-
 precision highp float;
 
 // Color (and depth, via a shared depth attachment) of the rest of the scene,

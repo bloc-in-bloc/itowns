@@ -54,6 +54,14 @@ class HighQualitySplatsPass extends Pass {
             fragmentShader: NormalizeSplatsFS,
             depthTest: false,
             depthWrite: false,
+            // three.js inserts the `#extension` pragma itself, ahead of any
+            // other injected shader code; a hand-written `#extension` line in
+            // the .glsl source would end up after three.js' own prefix code,
+            // which is invalid per the ESSL3 spec (extension directives must
+            // precede all non-preprocessor tokens).
+            extensions: {
+                fragDepth: true,
+            },
         });
 
         // One { depthMaterial, attributeMaterial } pair per point-cloud
