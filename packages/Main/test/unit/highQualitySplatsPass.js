@@ -110,4 +110,22 @@ describe('HighQualitySplatsPass', function () {
         assert.deepEqual(visibilitySamples, [false, false, true], 'hidden for depth+attribute, visible again for composite');
         assert.equal(otherObject3d.visible, true, 'must be restored after render()');
     });
+
+    it('should not permanently change the renderer clear color/alpha', function () {
+        const layer = createPointCloudLayer();
+        const view = createView([layer]);
+        const pass = new HighQualitySplatsPass(view);
+        pass.setSize(4, 4);
+
+        const renderer = new Renderer();
+        const originalColor = renderer.getClearColor(new THREE.Color());
+        const originalAlpha = renderer.getClearAlpha();
+
+        pass.render(renderer, { texture: new THREE.Texture() }, { texture: new THREE.Texture() });
+
+        assert.ok(renderer.getClearColor(new THREE.Color()).equals(originalColor),
+            'clear color used for the offscreen depth/attribute targets must be restored afterwards');
+        assert.equal(renderer.getClearAlpha(), originalAlpha,
+            'clear alpha used for the offscreen depth/attribute targets must be restored afterwards');
+    });
 });

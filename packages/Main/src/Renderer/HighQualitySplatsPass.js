@@ -69,6 +69,10 @@ class HighQualitySplatsPass extends Pass {
         // all of a layer's THREE.Points nodes, so we mirror that per-layer
         // granularity rather than per-node.
         this.pointCloudMaterials = new Map();
+
+        // Scratch Color reused every frame to save/restore the renderer's
+        // clear color around the offscreen depth/attribute passes.
+        this.savedClearColor = new THREE.Color();
     }
 
     setDepthTexture(depthTexture) {
@@ -137,6 +141,14 @@ class HighQualitySplatsPass extends Pass {
         if (pointCloudLayers.length > 0) {
             const savedVisibility = this.hideOtherObjects(pointCloudLayers);
 
+            // The depth/attribute targets are cleared to transparent black
+            // below; renderer.setClearColor() is global renderer state, not
+            // per-render-target, so it must be saved and restored around
+            // these offscreen clears to avoid corrupting the color the rest
+            // of the scene (and the next frame) clears to.
+            const savedClearAlpha = renderer.getClearAlpha();
+            renderer.getClearColor(this.savedClearColor);
+
             // Depth pass: plain, unmodified point rendering; standard depth
             // test picks the nearest splat per pixel, exactly like today's
             // single-pass rendering.
@@ -166,6 +178,8 @@ class HighQualitySplatsPass extends Pass {
             renderer.setClearColor(0x000000, 0);
             renderer.clear(true, true, true);
             renderer.render(this.view.scene, this.view.camera3D);
+
+            renderer.setClearColor(this.savedClearColor, savedClearAlpha);
 
             // Restore each point cloud layer's original material and the
             // rest of the scene's visibility.
