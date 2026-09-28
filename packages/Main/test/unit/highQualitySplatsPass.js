@@ -128,4 +128,36 @@ describe('HighQualitySplatsPass', function () {
         assert.equal(renderer.getClearAlpha(), originalAlpha,
             'clear alpha used for the offscreen depth/attribute targets must be restored afterwards');
     });
+
+    it('should not clear the depth buffer before the attribute pass', function () {
+        // rtAttribute shares its depth texture with rtDepth: the attribute
+        // pass' depth test relies on the depth pass' result being intact to
+        // only accumulate splats at (or in front of) the nearest surface.
+        const layer = createPointCloudLayer();
+        const view = createView([layer]);
+        const pass = new HighQualitySplatsPass(view);
+        pass.setSize(4, 4);
+
+        const renderer = new Renderer();
+        const clearCallsPerTarget = [];
+        let currentTarget = null;
+        const originalSetRenderTarget = renderer.setRenderTarget.bind(renderer);
+        renderer.setRenderTarget = (target) => {
+            currentTarget = target;
+            originalSetRenderTarget(target);
+        };
+        renderer.clear = (color, depth) => {
+            clearCallsPerTarget.push({ target: currentTarget, depth });
+        };
+
+        pass.render(renderer, { texture: new THREE.Texture() }, { texture: new THREE.Texture() });
+
+        const depthPassClear = clearCallsPerTarget.find(c => c.target === pass.rtDepth);
+        const attributePassClear = clearCallsPerTarget.find(c => c.target === pass.rtAttribute);
+        assert.ok(depthPassClear, 'the depth pass target must be cleared');
+        assert.equal(depthPassClear.depth, true, 'the depth pass must clear depth (nothing to preserve yet)');
+        assert.ok(attributePassClear, 'the attribute pass target must be cleared');
+        assert.equal(attributePassClear.depth, false,
+            'the attribute pass must not clear depth, or it would erase the depth pass result it depth-tests against');
+    });
 });

@@ -166,7 +166,13 @@ class HighQualitySplatsPass extends Pass {
 
             // Attribute pass: weighted additive accumulation, depth-tested
             // against the depth pass' depth texture (shared via
-            // rtAttribute.depthTexture = rtDepth.depthTexture).
+            // rtAttribute.depthTexture = rtDepth.depthTexture). Depth must
+            // NOT be cleared here: it still holds the depth pass' result,
+            // which this pass' depth test relies on to only accumulate
+            // splats at (or in front of) the nearest surface. Clearing it
+            // would reset every pixel to the far plane, making the depth
+            // test pass unconditionally and letting occluded/background
+            // splats bleed into the blend.
             for (const layer of pointCloudLayers) {
                 const { attributeMaterial } = this.getPointCloudMaterials(layer);
                 this.syncMaterial(attributeMaterial, layer.material);
@@ -176,7 +182,7 @@ class HighQualitySplatsPass extends Pass {
             }
             renderer.setRenderTarget(this.rtAttribute);
             renderer.setClearColor(0x000000, 0);
-            renderer.clear(true, true, true);
+            renderer.clear(true, false, true);
             renderer.render(this.view.scene, this.view.camera3D);
 
             renderer.setClearColor(this.savedClearColor, savedClearAlpha);
