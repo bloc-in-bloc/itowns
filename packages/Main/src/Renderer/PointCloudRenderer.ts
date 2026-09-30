@@ -4,7 +4,7 @@ import {
     type WebGLRenderer,
     HalfFloatType,
 } from 'three';
-import { EffectComposer, LambdaPass, RenderPass } from 'postprocessing';
+import { EffectComposer, LambdaPass, RenderPass, CopyPass } from 'postprocessing';
 import { View, Layer } from 'Main';
 import { EDLPass } from './Postprocessing/EDLPass';
 
@@ -14,6 +14,8 @@ class PointCloudRenderer {
     private _composer: EffectComposer;
     private _edlPass: EDLPass;
     private _terrainPass: RenderPass;
+    private _fallbackPass: RenderPass;
+    private _copyPass: CopyPass;
 
     private _currentOthers: LayerWithObject3d[] = [];
     private _currentPCs: LayerWithObject3d[] = [];
@@ -25,6 +27,10 @@ class PointCloudRenderer {
         this._terrainPass = new RenderPass();
         this._edlPass = new EDLPass(width, height);
 
+        this._fallbackPass = new RenderPass();
+        this._fallbackPass.clear = false;
+        this._copyPass = new CopyPass();
+
         this._composer.addPass(new LambdaPass(() => {
             this._currentOthers.forEach((l) => { l.object3d.visible = true; });
             this._currentPCs.forEach((l) => { l.object3d.visible = false; });
@@ -35,6 +41,15 @@ class PointCloudRenderer {
             this._currentPCs.forEach((l) => { l.object3d.visible = true; });
         }));
         this._composer.addPass(this._edlPass);
+        this._composer.addPass(this._fallbackPass);
+        this._copyPass = new CopyPass();
+        this._composer.addPass(this._copyPass);
+
+        this._edlPass.enabled = false;
+    }
+
+    get edlPass(): EDLPass {
+        return this._edlPass;
     }
 
     setSize(width: number, height: number) {
@@ -42,6 +57,12 @@ class PointCloudRenderer {
     }
 
     render(scene: Scene, camera: Camera, view: View) {
+        // Quick hack to enable/disable EDL
+        const edl = this._edlPass.enabled;
+        this._fallbackPass.enabled = !edl;
+        this._edlPass.renderToScreen = edl;
+        this._copyPass.enabled = !edl;
+
         const layers = view.getLayers(l => l.isGeometryLayer && l.visible);
         this._currentOthers = layers.filter(l => !l.isPointCloudLayer);
         this._currentPCs = layers.filter(l => l.isPointCloudLayer);
