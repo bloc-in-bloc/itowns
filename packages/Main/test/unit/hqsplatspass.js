@@ -1,0 +1,70 @@
+import assert from 'assert';
+import * as THREE from 'three';
+import { HQSplatsPass } from 'Renderer/Postprocessing/HQSplatsPass';
+import { EDLPass } from 'Renderer/Postprocessing/EDLPass';
+import PointsMaterial, { PNTS_SIZE_MODE } from 'Renderer/PointsMaterial';
+import Renderer from './bootstrap';
+
+describe('HQSplatsPass', function () {
+    let edlPass;
+    let hqSplatsPass;
+
+    beforeEach(function () {
+        edlPass = new EDLPass(64, 64);
+        hqSplatsPass = new HQSplatsPass(edlPass, 64, 64);
+    });
+
+    it('is disabled by default', function () {
+        assert.equal(hqSplatsPass.enabled, false);
+    });
+
+    it('resizes both offscreen render targets and the resolution uniform', function () {
+        hqSplatsPass.setSize(128, 256);
+        assert.deepEqual(hqSplatsPass.resolution, new THREE.Vector2(128, 256));
+    });
+
+    it('shares a single depth texture between the depth and attribute targets', function () {
+        assert.equal(
+            hqSplatsPass._depthTarget.depthTexture,
+            hqSplatsPass._attributeTarget.depthTexture,
+        );
+    });
+
+    it('does nothing before mainScene/mainCamera are set', function () {
+        const renderer = new Renderer();
+        assert.doesNotThrow(() => {
+            hqSplatsPass.render(renderer, null, null);
+        });
+    });
+
+    it('swaps eligible layers to the depth/attribute HQ materials, in order, then restores them', function () {
+        const renderer = new Renderer();
+        const seenMaterials = [];
+        renderer.render = () => {
+            seenMaterials.push(node.material);
+        };
+        renderer.clear = () => {};
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera();
+        hqSplatsPass.mainScene = scene;
+        hqSplatsPass.mainCamera = camera;
+
+        const originalMaterial = new PointsMaterial({ sizeMode: PNTS_SIZE_MODE.ADAPTIVE });
+        const group = new THREE.Group();
+        const node = new THREE.Points(new THREE.BufferGeometry(), originalMaterial);
+        group.add(node);
+        const layer = { group, material: originalMaterial };
+        hqSplatsPass.pointCloudLayers = [layer];
+
+        const inputBuffer = new THREE.WebGLRenderTarget(64, 64);
+        const outputBuffer = new THREE.WebGLRenderTarget(64, 64);
+        hqSplatsPass.render(renderer, inputBuffer, outputBuffer);
+
+        assert.equal(seenMaterials.length, 3);
+        assert.equal(seenMaterials[0].defines.HQ_DEPTH_PASS, 1);
+        assert.equal(seenMaterials[1].defines.HQ_WEIGHTED, 1);
+        assert.equal(seenMaterials[2], originalMaterial);
+        assert.equal(node.material, originalMaterial);
+    });
+});
