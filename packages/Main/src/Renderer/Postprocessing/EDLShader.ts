@@ -17,11 +17,46 @@ import {
 
 
 // This is the vertex shader used by CopyMaterial for pmndrs/postprocessing.
-const vertexShader = /* glsl */`
+const fullscreenVertexShader = /* glsl */`
 out vec2 vUv;
 void main() {
     vUv = position.xy * 0.5 + 0.5;
     gl_Position = vec4(position.xy, 1.0, 1.0);
+}
+`;
+
+const edlResponseChunk = /* glsl */`
+float getDepth(const in vec2 screenPosition) {
+    return texture2D(tDepth, screenPosition).x;
+}
+
+float getLinearDepth(const in vec2 screenPosition) {
+    #if PERSPECTIVE_CAMERA == 1
+        float fragCoordZ = texture2D(tDepth, screenPosition).x;
+        float viewZ = perspectiveDepthToViewZ(fragCoordZ, cameraNear, cameraFar);
+        return viewZToOrthographicDepth(viewZ, cameraNear, cameraFar);
+    #else
+        return texture2D(tDepth, screenPosition).x;
+    #endif
+}
+
+float getLogDepth(const in vec2 screenPosition) {
+    float linear = getLinearDepth(screenPosition);
+    return log2(max(linear, 0.0000001));
+}
+
+float computeEDL(const in vec2 screenPosition) {
+    float logDepth = getLogDepth(screenPosition);
+    vec2 uvRadius = kernelRadius / resolution;
+
+    float edl = 0.0;
+    for (int i = 0; i < KERNEL_SIZE; ++i) {
+        vec2 uvNeighbour = clamp(screenPosition + uvRadius * kernel[i], 0.0, 1.0);
+        edl = edl + max(0.0, logDepth - getLogDepth(uvNeighbour));
+    }
+    edl = edl / float(KERNEL_SIZE);
+
+    return exp(-edl * 300.0 * edlStrength);
 }
 `;
 
@@ -50,24 +85,7 @@ uniform float edlStrength;
 
 in vec2 vUv;
 
-float getDepth(const in vec2 screenPosition) {
-    return texture2D(tDepth, screenPosition).x;
-}
-
-float getLinearDepth(const in vec2 screenPosition) {
-    #if PERSPECTIVE_CAMERA == 1
-        float fragCoordZ = texture2D(tDepth, screenPosition).x;
-        float viewZ = perspectiveDepthToViewZ(fragCoordZ, cameraNear, cameraFar);
-        return viewZToOrthographicDepth(viewZ, cameraNear, cameraFar);
-    #else
-        return texture2D(tDepth, screenPosition).x;
-    #endif
-}
-
-float getLogDepth(const in vec2 screenPosition) {
-    float linear = getLinearDepth(screenPosition);
-    return log2(max(linear, 0.0000001));
-}
+${edlResponseChunk}
 
 void main() {
     float depth = getDepth(vUv);
@@ -79,7 +97,6 @@ void main() {
     bool occluded = depth >= sceneDepth;
     #endif
 
-    // Skip EDL shading if the point is occluded by the scene or if the depth is invalid (clear value).
     if (depth == DEPTH_CLEAR_VALUE || occluded) {
         gl_FragColor = texture2D(tScene, vUv);
         gl_FragDepth = sceneDepth;
@@ -88,17 +105,7 @@ void main() {
     }
 
     vec4 color = texture2D(tDiffuse, vUv);
-    float logDepth = getLogDepth(vUv);
-    vec2 uvRadius = kernelRadius / resolution;
-
-    float edl = 0.0;
-    for (int i = 0; i < KERNEL_SIZE; ++i) {
-        vec2 uvNeighbour = clamp(vUv + uvRadius * kernel[i], 0.0, 1.0);
-        edl = edl + max(0.0, logDepth - getLogDepth(uvNeighbour));
-    }
-    edl = edl / float(KERNEL_SIZE);
-
-    edl = exp(-edl * 300.0 * edlStrength);
+    float edl = computeEDL(vUv);
 
     gl_FragColor = vec4(color.rgb * edl, color.a);
     gl_FragDepth = depth;
@@ -140,8 +147,8 @@ const MakeEDLShader = (
 
     uniforms: {
         tScene: { value: null },
-        tSceneDepth: { value: null },
         tDepth: { value: null },
+        tSceneDepth: { value: null },
         tDiffuse: { value: null },
         kernel: { value: generateKernel(kernelSize) },
         resolution: { value: new Vector2(width, height) },
@@ -151,13 +158,13 @@ const MakeEDLShader = (
         edlStrength: { value: 0.7 },
     },
 
-    vertexShader,
+    vertexShader: fullscreenVertexShader,
     fragmentShader,
 
     blending: NoBlending,
     toneMapped: false,
     depthWrite: true,
-    depthTest: true,
+    depthTest: false,
 });
 
-export { MakeEDLShader };
+export { MakeEDLShader, generateKernel, edlResponseChunk, fullscreenVertexShader };

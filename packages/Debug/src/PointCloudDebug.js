@@ -105,12 +105,16 @@ function setupPostprocessingUI(view, datUi) {
     const notify = () => view.notifyChange();
     const postprocessingUI = datUi.addFolder(postprocessingFolderName);
 
-    const { edlPass } = pointCloudRenderer;
+    const { edlPass, hqSplatsPass } = pointCloudRenderer;
     if (edlPass) {
         const edlUI = postprocessingUI.addFolder('Eye-Dome Lighting');
         edlUI.add(edlPass, 'enabled').name('Enabled').onChange(notify);
         edlUI.add(edlPass, 'strength', 0, 10, 0.1).name('Strength').onChange(notify);
         edlUI.add(edlPass, 'kernelRadius', 0.1, 5, 0.1).name('Radius').onChange(notify);
+    }
+    if (hqSplatsPass) {
+        const hqSplatsUI = postprocessingUI.addFolder('High-Quality Splats');
+        hqSplatsUI.add(hqSplatsPass, 'enabled').name('Enabled').onChange(notify);
     }
 }
 

@@ -45,4 +45,13 @@ void main() {
 #include <fog_fragment>
 #include <premultiplied_alpha_fragment>
 
+    #ifdef HQ_WEIGHTED
+        // Potree/Schuetz HQ-splats weighted attribute pass: accumulate
+        // color and a radial weight (premultiplied) into an additively
+        // blended target; the normalization pass later divides by the
+        // accumulated weight.
+        float weightDist = length(gl_PointCoord - 0.5) * 2.0;
+        float weight = pow(max(0.0, 1.0 - weightDist), 1.5);
+        gl_FragColor = vec4(gl_FragColor.rgb * weight, weight);
+    #endif
 }

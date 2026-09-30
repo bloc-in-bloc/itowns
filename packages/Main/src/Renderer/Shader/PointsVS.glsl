@@ -4,6 +4,7 @@
 #include <logdepthbuf_pars_vertex>
 #include <clipping_planes_pars_vertex>
 varying vec4 vColor; // color_pars_vertex
+varying float vRadius;
 
 #ifdef USE_POINTS_UV
     varying vec2 vUv;
@@ -188,6 +189,7 @@ void main() {
     bool isPerspective = isPerspectiveMatrix(projectionMatrix);
     float depthAttenuationFactor = scale / -mvPosition.z;
 
+    vRadius = 0.0;
     if (sizeMode == PNTS_SIZE_MODE_ATTENUATED) {
         if (isPerspective) {
             gl_PointSize *= depthAttenuationFactor;
@@ -199,8 +201,21 @@ void main() {
             float pointSizeAttenuation = pow(2.0, getLOD());
             float worldSpaceSize = size * r / pointSizeAttenuation;
             gl_PointSize = worldSpaceSize * depthAttenuationFactor;
+            vRadius = worldSpaceSize * 0.5;
         }
     }
+
+    #ifdef HQ_DEPTH_PASS
+        // Potree/Schuetz HQ-splats depth pre-pass: inflate the projected
+        // depth by 2x the splat's world-space radius so the depth
+        // pre-pass records the *far* surface of each splat, giving the
+        // later weighted attribute pass room to depth-test against.
+        float originalDepth = gl_Position.w;
+        float adjustedDepth = originalDepth + 2.0 * vRadius;
+        float adjust = adjustedDepth / originalDepth;
+        mvPosition.xyz *= adjust;
+        gl_Position = projectionMatrix * mvPosition;
+    #endif
 
 #include <logdepthbuf_vertex>
 #include <clipping_planes_vertex>
