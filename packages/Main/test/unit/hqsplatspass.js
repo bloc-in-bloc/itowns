@@ -67,4 +67,56 @@ describe('HQSplatsPass', function () {
         assert.equal(seenMaterials[2], originalMaterial);
         assert.equal(node.material, originalMaterial);
     });
+
+    it('fully clears the depth pre-pass but only clears color/stencil (never depth) on the attribute pass', function () {
+        const renderer = new Renderer();
+        const clearCalls = [];
+        renderer.clear = (color, depth, stencil) => { clearCalls.push([color, depth, stencil]); };
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera();
+        hqSplatsPass.mainScene = scene;
+        hqSplatsPass.mainCamera = camera;
+        hqSplatsPass.pointCloudLayers = [];
+
+        hqSplatsPass.render(
+            renderer,
+            new THREE.WebGLRenderTarget(64, 64),
+            new THREE.WebGLRenderTarget(64, 64),
+        );
+
+        assert.deepEqual(clearCalls[0], [true, true, true]);
+        assert.deepEqual(clearCalls[1], [true, false, true]);
+    });
+
+    it('resets the accumulation buffer to transparent black, restoring the previous clear color/alpha afterward', function () {
+        const renderer = new Renderer();
+        renderer.clear = () => {};
+        const seenClearColors = [];
+        const originalSetClearColor = renderer.setClearColor.bind(renderer);
+        renderer.setClearColor = (color, alpha) => {
+            seenClearColors.push([color, alpha]);
+            originalSetClearColor(color, alpha);
+        };
+        renderer.getClearColor = target => target.set(0x123456);
+        renderer.getClearAlpha = () => 0.5;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera();
+        hqSplatsPass.mainScene = scene;
+        hqSplatsPass.mainCamera = camera;
+        hqSplatsPass.pointCloudLayers = [];
+
+        hqSplatsPass.render(
+            renderer,
+            new THREE.WebGLRenderTarget(64, 64),
+            new THREE.WebGLRenderTarget(64, 64),
+        );
+
+        assert.equal(seenClearColors.length, 2);
+        assert.equal(seenClearColors[0][0], 0x000000);
+        assert.equal(seenClearColors[0][1], 0);
+        assert.equal(seenClearColors[1][0].getHex(), 0x123456);
+        assert.equal(seenClearColors[1][1], 0.5);
+    });
 });

@@ -428,6 +428,7 @@ class Renderer {
     getDrawingBufferSize() { return new THREE.Vector2(4, 4); } // arbitrary size
     getClearAlpha() { return 1; }
     setClearAlpha() {}
+    getClearColor(target) { return target ? target.set(0x000000) : new THREE.Color(0x000000); }
     dispose() {}
 }
 

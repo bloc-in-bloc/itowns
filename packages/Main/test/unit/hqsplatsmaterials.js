@@ -5,7 +5,7 @@ import {
     syncHQSplatMaterial,
     setPointCloudLayerMaterial,
 } from 'Renderer/Postprocessing/HQSplatsMaterials';
-import PointsMaterial, { PNTS_SHAPE } from 'Renderer/PointsMaterial';
+import PointsMaterial, { PNTS_SHAPE, PNTS_SIZE_MODE, PNTS_MODE } from 'Renderer/PointsMaterial';
 
 describe('HQSplatsMaterials', function () {
     describe('createHQSplatMaterials', function () {
@@ -37,6 +37,33 @@ describe('HQSplatsMaterials', function () {
 
             assert.equal(depthMaterial.size, 4);
             assert.equal(depthMaterial.opacity, 0.5);
+        });
+
+        it('copies the display mode so HQ passes render the layer\'s actual coloring', function () {
+            const source = new PointsMaterial({ mode: PNTS_MODE.INTENSITY });
+
+            const { depthMaterial, attributeMaterial } = createHQSplatMaterials();
+            syncHQSplatMaterial(depthMaterial, source);
+            syncHQSplatMaterial(attributeMaterial, source);
+
+            assert.equal(depthMaterial.mode, PNTS_MODE.INTENSITY);
+            assert.equal(attributeMaterial.mode, PNTS_MODE.INTENSITY);
+        });
+
+        it('copies sizeMode and scale so ADAPTIVE point clouds keep their real footprint', function () {
+            const source = new PointsMaterial({
+                sizeMode: PNTS_SIZE_MODE.ADAPTIVE,
+                scale: 42,
+            });
+
+            const { depthMaterial, attributeMaterial } = createHQSplatMaterials();
+            syncHQSplatMaterial(depthMaterial, source);
+            syncHQSplatMaterial(attributeMaterial, source);
+
+            assert.equal(depthMaterial.sizeMode, PNTS_SIZE_MODE.ADAPTIVE);
+            assert.equal(depthMaterial.scale, 42);
+            assert.equal(attributeMaterial.sizeMode, PNTS_SIZE_MODE.ADAPTIVE);
+            assert.equal(attributeMaterial.scale, 42);
         });
     });
 

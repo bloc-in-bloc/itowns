@@ -72,4 +72,47 @@ describe('PointCloudRenderer', function () {
         assert.equal(pointCloudRenderer._fallbackPass.enabled, true);
         assert.equal(pointCloudRenderer._copyPass.enabled, false);
     });
+
+    it('drives the LambdaPass visibility routing: terrain, then non-adaptive PCs, then adaptive PCs', function () {
+        // Exercise the real composer pass graph (rather than the stubbed
+        // `_composer.render` used by the other tests here) to verify the
+        // LambdaPasses that hide/show layers around each render sub-pass
+        // actually produce the intended visibility sequence.
+        delete pointCloudRenderer._composer.render;
+        pointCloudRenderer._terrainPass.render = () => {
+            visibilityAtStage.terrain = { ...snapshot() };
+        };
+        pointCloudRenderer._fallbackPass.render = () => {
+            visibilityAtStage.nonAdaptivePCs = { ...snapshot() };
+        };
+        pointCloudRenderer._hqSplatsPass.render = () => {
+            visibilityAtStage.adaptivePCs = { ...snapshot() };
+        };
+        pointCloudRenderer._copyPass.render = () => {};
+        pointCloudRenderer.hqSplatsPass.enabled = true;
+
+        const other = { isGeometryLayer: true, isPointCloudLayer: false, visible: true, object3d: { visible: true } };
+        const adaptive = makePCLayer(PNTS_SIZE_MODE.ADAPTIVE);
+        const attenuated = makePCLayer(PNTS_SIZE_MODE.ATTENUATED);
+        const visibilityAtStage = {};
+        function snapshot() {
+            return {
+                other: other.object3d.visible,
+                adaptive: adaptive.object3d.visible,
+                attenuated: attenuated.object3d.visible,
+            };
+        }
+
+        const view = { getLayers: () => [other, adaptive, attenuated] };
+        pointCloudRenderer.render(new THREE.Scene(), new THREE.PerspectiveCamera(), view);
+
+        assert.deepEqual(visibilityAtStage.terrain, { other: true, adaptive: false, attenuated: false });
+        assert.deepEqual(visibilityAtStage.nonAdaptivePCs, { other: false, adaptive: false, attenuated: true });
+        assert.deepEqual(visibilityAtStage.adaptivePCs, { other: false, adaptive: true, attenuated: false });
+
+        // All layers must be visible again once rendering completes.
+        assert.equal(other.object3d.visible, true);
+        assert.equal(adaptive.object3d.visible, true);
+        assert.equal(attenuated.object3d.visible, true);
+    });
 });

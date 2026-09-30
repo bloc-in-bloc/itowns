@@ -42,7 +42,7 @@ function createHQSplatMaterials(): HQSplatMaterials {
 }
 
 const SYNCED_PROPERTIES = [
-    'size', 'opacity', 'mode', 'minAttenuatedSize', 'maxAttenuatedSize',
+    'mode', 'size', 'opacity', 'sizeMode', 'scale', 'minAttenuatedSize', 'maxAttenuatedSize',
     'intensityRange', 'elevationRange', 'angleRange', 'gamma', 'ambientBoost',
     'classificationTexture', 'discreteTexture', 'gradientTexture',
     'visibilityTexture', 'visibleNodes',

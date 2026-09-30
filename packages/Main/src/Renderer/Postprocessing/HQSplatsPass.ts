@@ -4,6 +4,7 @@ import {
     WebGLRenderTarget,
     type WebGLRenderer,
     Camera,
+    Color,
     Object3DEventMap,
     Scene,
     DepthTexture,
@@ -40,6 +41,7 @@ class HQSplatsPass extends Pass {
     private _depthTarget: WebGLRenderTarget;
     private _attributeTarget: WebGLRenderTarget;
     private _materialCache = new WeakMap<object, HQSplatMaterials>();
+    private _savedClearColor = new Color();
 
     /** Eligible (ADAPTIVE size mode) point-cloud layers to render this
      * frame. Set by `PointCloudRenderer` before `render()` is invoked. */
@@ -50,8 +52,10 @@ class HQSplatsPass extends Pass {
 
         this.needsDepthTexture = false;
         // Disabled by default: HQ splats are opt-in and only actually
-        // enabled by `PointCloudRenderer`'s wiring, mutually exclusive
-        // with `edlPass` (see `EDLPass`, disabled the same way).
+        // enabled by `PointCloudRenderer`'s wiring (see `EDLPass`,
+        // disabled the same way). EDL and HQ splats compose (HQ folds in
+        // EDL shading when both are enabled); they are not mutually
+        // exclusive.
         this.enabled = false;
         this._edlPass = edlPass;
 
@@ -138,16 +142,25 @@ class HQSplatsPass extends Pass {
 
         // --- Attribute pass: weighted additive blending, depth-tested
         // (not written) against the pre-pass surface. The depth buffer is
-        // shared with _depthTarget and must NOT be cleared here.
+        // shared with _depthTarget and must NOT be cleared here. The
+        // accumulation buffer must start from (0, 0, 0, 0), not the
+        // renderer's current clear color (e.g. sky color), or normalized
+        // colors come out tinted/dimmed.
         layers.forEach((layer) => {
             const { attributeMaterial } = this.getMaterials(layer);
             syncHQSplatMaterial(attributeMaterial, layer.material);
             setPointCloudLayerMaterial(layer, attributeMaterial);
         });
 
+        renderer.getClearColor(this._savedClearColor);
+        const savedClearAlpha = renderer.getClearAlpha();
+        renderer.setClearColor(0x000000, 0);
+
         renderer.setRenderTarget(this._attributeTarget);
         renderer.clear(true, false, true);
         renderer.render(this._activeScene, this._activeCamera);
+
+        renderer.setClearColor(this._savedClearColor, savedClearAlpha);
 
         // --- Restore each layer's own material ---
         layers.forEach((layer) => {
