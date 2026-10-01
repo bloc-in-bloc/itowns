@@ -192,17 +192,6 @@
                 }
                 gui = new GUI();
                 PointCloudDebug.initTools(view, layer, gui);
-
-                const edlPass = view.mainLoop.gfxEngine.pointCloudRenderer.edlPass;
-                const edlFolder = gui.addFolder('Eye-Dome Lighting');
-                edlFolder.add(edlPass, 'enabled').name('Enabled').onChange(() => view.notifyChange());
-                edlFolder.add(edlPass, 'strength', 0, 10, 0.1).name('Strength').onChange(() => view.notifyChange());
-                edlFolder.add(edlPass, 'kernelRadius', 0.1, 5, 0.1).name('Radius').onChange(() => view.notifyChange());
-                edlFolder.open();
-
-                const hqSplatsPass = view.mainLoop.gfxEngine.pointCloudRenderer.hqSplatsPass;
-                const hqSplatsFolder = gui.addFolder('High-Quality Splats');
-                hqSplatsFolder.add(hqSplatsPass, 'enabled').name('Enabled').onChange(() => view.notifyChange());
             }
 
             if (!isEmbedded) {
