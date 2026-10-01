@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import OBBHelper from './OBBHelper';
 
 const folderName = 'Styling';
+const postprocessingFolderName = 'Postprocessing';
 
 function getController(gui, name) {
     const controllers = gui.folders.filter(f => f._title === folderName)[0].controllers;
@@ -94,6 +95,24 @@ function createPointsOBBHelper(node) {
 }
 
 const NODE_BOXES_SYMBOL = Symbol('PointCloudNode.boxes');
+
+function setupPostprocessingUI(view, datUi) {
+    const pointCloudRenderer = view.mainLoop?.gfxEngine?.pointCloudRenderer;
+    if (!pointCloudRenderer) {
+        return;
+    }
+
+    const notify = () => view.notifyChange();
+    const postprocessingUI = datUi.addFolder(postprocessingFolderName);
+
+    const { edlPass} = pointCloudRenderer;
+    if (edlPass) {
+        const edlUI = postprocessingUI.addFolder('Eye-Dome Lighting');
+        edlUI.add(pointCloudRenderer, 'edlEnabled').name('Enabled').onChange(notify);
+        edlUI.add(edlPass, 'strength', 0, 10, 0.1).name('Strength').onChange(notify);
+        edlUI.add(edlPass, 'kernelRadius', 0.1, 5, 0.1).name('Radius').onChange(notify);
+    }
+}
 
 class PointCloudDebug {
     constructor() {
@@ -348,6 +367,8 @@ export default {
         debugUI.add(layer, 'dbgDisplayParents').name('Display parents of sticky node').onChange(update);
 
         setupControllerVisibily(layer.debugUI, layer.material.mode, layer.material.sizeMode);
+
+        setupPostprocessingUI(view, datUi);
 
         const isInHierarchy = function isInHierarchy(name1, name2) {
             return (layer.dbgDisplaySticky && name1 === name2)
