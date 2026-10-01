@@ -192,13 +192,6 @@
                 }
                 gui = new GUI();
                 PointCloudDebug.initTools(view, layer, gui);
-
-                const edlFolder = gui.addFolder('Eye-Dome Lighting');
-                const pointCloudRenderer = view.mainLoop.gfxEngine.pointCloudRenderer;
-                edlFolder.add(pointCloudRenderer.edlPass, 'enabled').name('Enabled').onChange(() => view.notifyChange());
-                edlFolder.add(pointCloudRenderer.edlPass, 'strength', 0, 10, 0.1).name('Strength').onChange(() => view.notifyChange());
-                edlFolder.add(pointCloudRenderer.edlPass, 'kernelRadius', 0.1, 5, 0.1).name('Radius').onChange(() => view.notifyChange());
-                edlFolder.open();
             }
 
             if (!isEmbedded) {
