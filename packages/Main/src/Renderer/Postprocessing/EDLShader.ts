@@ -86,7 +86,7 @@ void main() {
         #include <colorspace_fragment>
         return;
     }
-    
+
     vec4 color = texture2D(tDiffuse, vUv);
     float logDepth = getLogDepth(vUv);
     vec2 uvRadius = kernelRadius / resolution;
@@ -110,6 +110,9 @@ void main() {
  * Generates a kernel of evenly distributed 2D sample directions around a
  * circle.
  * Used for sampling neighbor depths in the EDL algorithm.
+ *
+ * @param kernelSize - Number of sample directions.
+ * @returns Flat array of (x, y) pairs.
  */
 function generateKernel(kernelSize: number): Float32Array {
     const kernel = new Float32Array(kernelSize * 2);
@@ -124,7 +127,7 @@ function generateKernel(kernelSize: number): Float32Array {
 }
 
 const MakeEDLShader = (
-    kernelSize:number,
+    kernelSize: number,
     width: number,
     height: number,
 ) => new ShaderMaterial({
