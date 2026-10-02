@@ -29,12 +29,13 @@ const fragmentShader = /* glsl */ `
 #include <packing>
 
 #ifdef USE_REVERSED_DEPTH_BUFFER
-#define DEPTH_THRESHOLD 0.0
+#define DEPTH_CLEAR_VALUE 0.0
 #else
-#define DEPTH_THRESHOLD 1.0
+#define DEPTH_CLEAR_VALUE 1.0
 #endif
 
 uniform sampler2D tScene;
+uniform sampler2D tSceneDepth;
 uniform sampler2D tDepth;
 uniform sampler2D tDiffuse;
 
@@ -70,10 +71,18 @@ float getLogDepth(const in vec2 screenPosition) {
 
 void main() {
     float depth = getDepth(vUv);
-    
-    if (depth == DEPTH_THRESHOLD) {
+    float sceneDepth = texture2D(tSceneDepth, vUv).x;
+
+    #ifdef USE_REVERSED_DEPTH_BUFFER
+    bool occluded = depth <= sceneDepth;
+    #else
+    bool occluded = depth >= sceneDepth;
+    #endif
+
+    // Skip EDL shading if the point is occluded by the scene or if the depth is invalid (clear value).
+    if (depth == DEPTH_CLEAR_VALUE || occluded) {
         gl_FragColor = texture2D(tScene, vUv);
-        gl_FragDepth = DEPTH_THRESHOLD;
+        gl_FragDepth = sceneDepth;
         #include <colorspace_fragment>
         return;
     }
@@ -128,6 +137,7 @@ const MakeEDLShader = (
 
     uniforms: {
         tScene: { value: null },
+        tSceneDepth: { value: null },
         tDepth: { value: null },
         tDiffuse: { value: null },
         kernel: { value: generateKernel(kernelSize) },

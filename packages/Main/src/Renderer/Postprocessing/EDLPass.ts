@@ -8,7 +8,8 @@ import {
     Object3DEventMap,
     Scene,
     DepthTexture,
-    UnsignedShortType,
+    UnsignedIntType,
+    type Texture,
 } from 'three';
 import { Pass } from 'postprocessing';
 import { MakeEDLShader } from './EDLShader';
@@ -26,14 +27,22 @@ class EDLPass extends Pass {
     constructor(width = 256, height = 256, kernelSize = 8) {
         super('EDLPass');
 
-        this.needsDepthTexture = false;
+        // Needs the depth of the previous passes (terrain, meshes...) to
+        // occlude point clouds.
+        this.needsDepthTexture = true;
 
         this.fullscreenMaterial = MakeEDLShader(kernelSize, width, height);
 
         this._pointCloudRenderTarget = new WebGLRenderTarget(width, height);
         this._pointCloudRenderTarget.depthBuffer = true;
         this._pointCloudRenderTarget.depthTexture = new DepthTexture(width, height);
-        this._pointCloudRenderTarget.depthTexture.type = UnsignedShortType;
+        // Same precision as the composer's depth texture to compare depths
+        this._pointCloudRenderTarget.depthTexture.type = UnsignedIntType;
+    }
+
+    setDepthTexture(depthTexture: Texture | null) {
+        (this.fullscreenMaterial as ShaderMaterial).uniforms.tSceneDepth.value =
+            depthTexture;
     }
 
     get resolution(): Vector2 {
