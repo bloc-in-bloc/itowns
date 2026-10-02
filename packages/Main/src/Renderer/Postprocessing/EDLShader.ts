@@ -74,6 +74,7 @@ void main() {
     if (depth == DEPTH_THRESHOLD) {
         gl_FragColor = texture2D(tScene, vUv);
         gl_FragDepth = DEPTH_THRESHOLD;
+        #include <colorspace_fragment>
         return;
     }
     
@@ -92,6 +93,7 @@ void main() {
 
     gl_FragColor = vec4(color.rgb * edl, color.a);
     gl_FragDepth = depth;
+    #include <colorspace_fragment>
 }
 `;
 
