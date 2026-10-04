@@ -60,10 +60,14 @@
         <div id="viewerDiv"></div>
 
         <script type="module">
+            import { WebGLRenderTarget, DepthTexture, FloatType } from 'three';
             import Stats from 'stats-gl';
             import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
             import { getFormat, getPointCloudClass, getDefaultAttribute, zoomToLayerGlobe } from './jsm/PointCloudHelper.js';
 
+            import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+            import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+            import { EDLPass } from './jsm/postprocessing/EDLPass.js';
             import {
                 CRS, MAIN_LOOP_EVENTS,
                 View,
@@ -82,6 +86,24 @@
             const formatSelect = document.getElementById('format');
             const crsInput = document.getElementById('crs');
             const errorMessage = document.getElementById('error-message');
+
+            function withHidden(view, predicate, func) {
+                const visibilitySet = new Set();
+                const layers = view.getLayers(layer => {
+                    return layer.isGeometryLayer && predicate(layer) && layer.visible
+                });
+
+                layers.forEach(layer => {
+                    layer.object3d.visible = false;
+                    visibilitySet.add(layer.object3d);
+                });
+
+                func(view);
+
+                visibilitySet.forEach(object => {
+                    object.visible = true;
+                });
+            }
 
             window.getFormat = getFormat;
 
@@ -127,6 +149,8 @@
                     }
                 });
                 currentView = view;
+
+                layer.crs = source.crs;
                 View.prototype.addLayer.call(view, layer);
 
                 const openSMJSON = await Fetcher.json('./layers/JSONLayers/OPENSM.json');
@@ -144,6 +168,9 @@
                         source: new WMTSSource(worldDTMJSON.source),
                     }),
                 );
+
+                await layer.whenReady;
+                zoomToLayerGlobe(view, layer);
 
                 const stats = new Stats();
                 stats.init(view.renderer);

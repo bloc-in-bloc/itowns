@@ -411,6 +411,7 @@ class Renderer {
             logarithmicDepthBuffer: true,
             isWebGL2: true,
         };
+        this.extensions = { has: () => false, get: () => null };
         this.debug = {};
         this.shadowMap = {};
     }
