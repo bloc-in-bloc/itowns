@@ -533,9 +533,10 @@ class OGC3DTilesLayer extends GeometryLayer {
                     new THREE.BufferAttribute(classificationData, 1),
                 );
             }
-        } else if (model.isMesh && geometry) {
+        } else if (model.isMesh && geometry && !geometry.hasAttribute('normal')) {
+            // Only compute normals when missing: recomputing would overwrite
+            // quantized normals (e.g. KHR_mesh_quantization int8 normals).
             geometry.computeVertexNormals();
-            geometry.needsUpdate = true;
         }
     }
 
